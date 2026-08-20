@@ -2,10 +2,10 @@
 -- DOTT TV Finance & Accounting System — Database Schema
 -- MySQL 8.0+ | InnoDB | utf8mb4
 -- Companion to: DOTT-TV-Finance-System-PRD.md
--- v1.2 — balance is a computed view (not a cached+triggered column),
--- resubmission cycles are explicit, audit_log is tamper-evident via
--- hash chain, and fund top-ups use a single-approver sign-off rather
--- than a tiered chain (money in carries less risk than money out).
+-- v1.3 — adds push_subscriptions (Web Push) alongside the resolved v1.2
+-- design: balance is a computed view, resubmission cycles are explicit,
+-- audit_log is tamper-evident via hash chain, and fund top-ups use a
+-- single-approver sign-off rather than a tiered chain.
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -244,13 +244,21 @@ CREATE TABLE invoices (
     due_date            DATE NULL,
     payment_status      ENUM('unpaid','partial','paid') NOT NULL DEFAULT 'unpaid',
     payment_date        DATE NULL,
+    -- Single-approver GM sign-off (Prompt 3.1): revenue recognition is not a
+    -- spend-control gate, so no tiered chain — just pending -> approved/rejected.
+    approval_status     ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    approved_by         INT UNSIGNED NULL,                 -- GM who approved
+    approved_at         DATETIME NULL,
+    rejected_reason     TEXT NULL,
     created_by          INT UNSIGNED NOT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_invoice_department FOREIGN KEY (department_id) REFERENCES departments(id),
     CONSTRAINT fk_invoice_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT fk_invoice_approved_by FOREIGN KEY (approved_by) REFERENCES users(id),
     INDEX idx_invoice_date (date),
-    INDEX idx_invoice_status (payment_status)
+    INDEX idx_invoice_status (payment_status),
+    INDEX idx_invoice_approval (approval_status)
 ) ENGINE=InnoDB;
 
 -- =====================================================================
@@ -342,6 +350,29 @@ CREATE TABLE settings (
     updated_by          INT UNSIGNED NULL,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_settings_updated_by FOREIGN KEY (updated_by) REFERENCES users(id)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- 10a. PUSH SUBSCRIPTIONS (Web Push — one row per subscribed browser/device)
+--
+-- A user can have multiple active subscriptions (phone + desktop, etc.) —
+-- no unique constraint on user_id alone, only on endpoint (a given browser
+-- installation can't be subscribed twice). Push send failures (expired/
+-- revoked subscriptions return HTTP 410 Gone from the push service) should
+-- delete the row rather than retry indefinitely — see Tech Spec §15a.
+-- =====================================================================
+
+CREATE TABLE push_subscriptions (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id             INT UNSIGNED NOT NULL,
+    endpoint            VARCHAR(500) NOT NULL UNIQUE,
+    p256dh_key          VARCHAR(255) NOT NULL,     -- browser-generated public key for payload encryption
+    auth_key            VARCHAR(255) NOT NULL,     -- browser-generated auth secret
+    user_agent          VARCHAR(255) NULL,          -- optional, for the Super Admin to identify "which device" in a device list
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at        DATETIME NULL,               -- updated on successful send, helps identify stale subscriptions
+    CONSTRAINT fk_push_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_push_user (user_id)
 ) ENGINE=InnoDB;
 
 -- =====================================================================

@@ -1,0 +1,193 @@
+/*
+  Source CSS for the standalone Tailwind CLI (v4, CSS-first @theme).
+  Tokens pulled directly from design-system-dotttv.md frontmatter.
+
+  Build (from repo root):
+    ./build/tailwind/tailwindcss -i build/tailwind/app.source.css -o public_html/assets/css/app.css --minify
+  Watch during development:
+    ./build/tailwind/tailwindcss -i build/tailwind/app.source.css -o public_html/assets/css/app.css --watch
+*/
+
+@import "tailwindcss";
+
+@source "../../app/views/**/*.php";
+@source "../../public_html/**/*.php";
+@source "../../public_html/**/*.js";
+
+/* Self-hosted Inter (latin subset, static instances — no Google Fonts CDN).
+   Files live in public_html/assets/fonts/; paths here are relative to the
+   compiled output at public_html/assets/css/app.css. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter-400.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/inter-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --color-surface: #faf8ff;
+  --color-surface-dim: #dbd9e0;
+  --color-surface-bright: #faf8ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f4f3f9;
+  --color-surface-container: #efedf3;
+  --color-surface-container-high: #e9e7ee;
+  --color-surface-container-highest: #e3e1e8;
+  --color-on-surface: #1a1b20;
+  --color-on-surface-variant: #444650;
+  --color-inverse-surface: #2f3035;
+  --color-inverse-on-surface: #f2f0f6;
+  --color-outline: #757682;
+  --color-outline-variant: #c5c6d2;
+  --color-surface-tint: #455b9f;
+
+  --color-primary: #000d35;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #001f63;
+  --color-on-primary-container: #7489d1;
+  --color-inverse-primary: #b5c4ff;
+
+  --color-secondary: #006782;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #11cbfd;
+  --color-on-secondary-container: #005268;
+
+  --color-tertiary: #280400;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #4c1001;
+  --color-on-tertiary-container: #d0745a;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-primary-fixed: #dce1ff;
+  --color-primary-fixed-dim: #b5c4ff;
+  --color-on-primary-fixed: #00164d;
+  --color-on-primary-fixed-variant: #2c4386;
+  --color-secondary-fixed: #bbe9ff;
+  --color-secondary-fixed-dim: #5dd4ff;
+  --color-on-secondary-fixed: #001f29;
+  --color-on-secondary-fixed-variant: #004d62;
+  --color-tertiary-fixed: #ffdbd1;
+  --color-tertiary-fixed-dim: #ffb5a0;
+  --color-on-tertiary-fixed: #3b0900;
+  --color-on-tertiary-fixed-variant: #78301b;
+
+  --color-background: #faf8ff;
+  --color-on-background: #1a1b20;
+  --color-surface-variant: #e3e1e8;
+
+  /* Status tones (soft/desaturated per design system) */
+  --color-success: #1e7e4f;
+  --color-success-container: #d6f0e2;
+  --color-warning: #a15c00;
+  --color-warning-container: #fde8cc;
+
+  --font-sans: 'Inter', sans-serif;
+
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  --spacing-sidebar-width: 260px;
+  --spacing-container-padding: 2rem;
+  --spacing-stack-gap: 1.5rem;
+  --spacing-grid-gutter: 1.25rem;
+  --spacing-card-padding: 1.5rem;
+
+  --text-display-lg: 32px;
+  --text-display-lg--font-weight: 600;
+  --text-display-lg--line-height: 1.2;
+  --text-display-lg--letter-spacing: -0.02em;
+
+  --text-headline-md: 24px;
+  --text-headline-md--font-weight: 600;
+  --text-headline-md--line-height: 1.3;
+  --text-headline-md--letter-spacing: -0.01em;
+
+  --text-headline-sm: 20px;
+  --text-headline-sm--font-weight: 600;
+  --text-headline-sm--line-height: 1.4;
+
+  --text-body-lg: 16px;
+  --text-body-lg--font-weight: 400;
+  --text-body-lg--line-height: 1.6;
+
+  --text-body-md: 14px;
+  --text-body-md--font-weight: 400;
+  --text-body-md--line-height: 1.5;
+
+  --text-label-md: 13px;
+  --text-label-md--font-weight: 500;
+  --text-label-md--line-height: 1.2;
+  --text-label-md--letter-spacing: 0.01em;
+
+  --text-label-sm: 11px;
+  --text-label-sm--font-weight: 600;
+  --text-label-sm--line-height: 1;
+
+  --shadow-ambient: 0px 4px 12px rgb(0 0 0 / 0.04);
+  --shadow-overlay: 0px 12px 24px rgb(0 0 0 / 0.08);
+}
+
+/* Alpine.js: hide [x-cloak] elements until Alpine has initialized, so
+   conditionally-shown elements (e.g. the password-visible icon state)
+   don't flash on screen before Alpine evaluates their x-show. */
+[x-cloak] {
+  display: none !important;
+}
+
+/* UI Component Guide §8c — scrollable-table edge fade. The inner
+   `overflow-x-auto` div of every table wrapper carries this class:
+   - overscroll-behavior-x: contain keeps a horizontal swipe on the table
+     from chaining into the page's own horizontal scroll (and never fights
+     the page's vertical scroll).
+   - -webkit-overflow-scrolling: touch keeps momentum scrolling on iOS.
+   - The has-more-* classes are toggled by app.js' initTableScrollFades();
+     each applies a mask-image linear gradient so the trailing edge of the
+     table softly fades out — the "this keeps going" hint for phones — only
+     while there is actually more content in that direction. */
+.table-scroll {
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll.has-more-right {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.table-scroll.has-more-left {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+}
+
+.table-scroll.has-more-left.has-more-right {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}

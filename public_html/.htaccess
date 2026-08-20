@@ -1,0 +1,37 @@
+# Re-grant access for this subtree — the parent .htaccess denies everything
+# by default (defense-in-depth in case Apache ever serves the parent dir).
+Require all granted
+
+RewriteEngine On
+
+# Production deploy (cPanel): uncomment to force HTTPS per Tech Spec §18.
+# Left off by default so local dev over plain HTTP keeps working.
+# RewriteCond %{HTTPS} off
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Serve existing files/directories (assets) directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else goes through the front controller
+RewriteRule ^ index.php [L]
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    # 'unsafe-inline' — inline view scripts define the Alpine component factories
+    # (e.g. historicalExpenseForm) and window.APP_BASE_PATH in the layout.
+    # 'unsafe-eval' — Alpine 3 compiles attribute expressions via new Function();
+    # there is no supported way to run Alpine without it. Both are required by the
+    # Tech Spec §16 Alpine-driven interaction model; revisit only if Alpine is
+    # swapped for a build-step framework that can emit nonces/hashes.
+    # Fonts, Alpine.js and SweetAlert2 are all self-hosted (public_html/assets/),
+    # so no external origins are needed anywhere in this policy.
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<FilesMatch "\.(env|sql|md)$">
+    Require all denied
+</FilesMatch>

@@ -1,0 +1,33 @@
+# Defense-in-depth fallback for when mod_rewrite is unavailable/disabled:
+# block direct access to sensitive files by extension. IMPORTANT — this is
+# scoped to specific files, not a blanket "Require all denied" for the
+# whole directory. Apache runs access-control (Require) in check_authz,
+# which always executes BEFORE fixups (the phase per-directory mod_rewrite
+# rules run in) — a blanket deny here would reject every request, including
+# ones meant to be forwarded into public_html/ below, before the rewrite
+# ever got a chance to run. Confirmed locally: with an unscoped
+# "Require all denied", Apache's authz_core rejected the ORIGINAL
+# unrewritten path (e.g. .../dotttvfinance/manifest.json) and 403'd
+# legitimate traffic along with everything it was meant to block.
+<FilesMatch "(^\.env$|\.(sql|md)$)">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+RewriteBase /dotttvfinance/
+
+# Explicit, fast-failing denies for whole directories that should never be
+# served under any URL. These live in the same mod_rewrite phase (fixups)
+# as the forward rule below, so — unlike the FilesMatch/Require block above
+# — they can coexist with it correctly: matching here short-circuits with
+# [F] before the catch-all forward rule is ever reached.
+RewriteRule ^(app|storage|vendor)(/|$) - [F,L]
+RewriteRule ^composer\.(json|lock)$ - [F,L]
+RewriteRule ^schema\.sql$ - [F,L]
+
+# Requests already targeting public_html/ pass through untouched here —
+# without this exclusion the rule below would keep matching its own
+# rewritten output (public_html/foo -> public_html/public_html/foo -> ...),
+# an infinite loop that Apache aborts with a 500.
+RewriteCond %{REQUEST_URI} !^/dotttvfinance/public_html/
+RewriteRule ^(.*)$ public_html/$1 [L]

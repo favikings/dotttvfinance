@@ -145,7 +145,11 @@ Payment request, approval chain status, payment voucher generation, payment meth
 Employees, salaries, allowances, deductions, loans/advances, net salary calculation, payment status.
 
 ### 6.7 Reports
-P&L, cash flow, balance sheet, revenue, expenses, receivables, payables, departmental expenses, budget vs. actual, tax reports, and the core **Statement of Expenditure** (opening balance, funds received, approved expenditure, outstanding liabilities, closing balance) matching the format already requested from Ifeoma — exportable as PDF for management review.
+P&L, cash flow, balance sheet, revenue, expenses, receivables, payables, departmental expenses, budget vs. actual, tax reports, and the core **Statement of Expenditure** (opening balance, funds received, approved expenditure, outstanding liabilities, closing balance) matching the format already requested from Ifeoma.
+
+**Fund Ledger** (added post-Phase-3-build, per direct feedback): a full chronological, all-departments transaction ledger — every expense and every fund top-up in one continuous list, ordered by date, with a running balance shown after each entry. This is distinct from the Statement of Expenditure (a period *summary*: opening/closing balance only) — the Ledger is the itemized detail behind that summary, closer in spirit to the original paper book's format. No department filter — this report exists specifically to show the whole picture in one place, departmental breakdowns are what the Departmental Expenses report is for.
+
+All reports exportable as **PDF** (management review, formal submission) and **Excel/.xlsx** (Ifeoma's own reconciliation work, auditor handoff — an editable spreadsheet is more useful than a static PDF for that purpose).
 
 ### 6.8 Settings (Super Admin only)
 Approval rules/thresholds, departments, expense categories, fund accounts, user management and role assignment, company details, audit log viewer.
@@ -154,7 +158,7 @@ Approval rules/thresholds, departments, expense categories, fund accounts, user 
 
 ## 7. Database Schema (entities)
 
-Core tables: `users`, `roles`, `permissions`, `role_permissions`, `departments`, `expense_categories`, `fund_account`, `fund_topups`, `expenses`, `approval_rules`, `expense_approvals`, `payment_vouchers`, `invoices`, `payroll_runs`, `payroll_items`, `audit_log`, `settings` (key-value for general config).
+Core tables: `users`, `roles`, `permissions`, `role_permissions`, `departments`, `expense_categories`, `fund_account`, `fund_topups`, `expenses`, `approval_rules`, `expense_approvals`, `payment_vouchers`, `invoices`, `payroll_runs`, `payroll_items`, `audit_log`, `settings` (key-value for general config), `push_subscriptions` (Web Push device registrations — see Tech Spec §15a).
 
 Key design principles:
 - `fund_account.current_balance` is a cached value recalculated inside the same DB transaction as any insert into `fund_topups` or `expenses` — never manually editable.

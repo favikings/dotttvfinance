@@ -1,0 +1,1 @@
+Take note of every Cron Job that must be done on Cpanel or ask the AI to list all cron jobs that must be set up on the Cpanel

@@ -38,6 +38,12 @@ REFERENCE DOCS (read the relevant one before generating code for any feature):
   prompt set follows
 - design-system-dotttv.md — exact design tokens (colors, type scale, spacing,
   radius) for every UI screen. Use these tokens, never invent new colors or spacing.
+- DOTT-TV-Finance-System-UI-Component-Guide.md — CANONICAL markup for every recurring
+  UI pattern (page shell/centering, sidebar, cards, buttons, status badges, metric
+  cards, forms, tables, empty states). For ANY screen with a UI component, copy the
+  matching pattern from this file exactly rather than composing new Tailwind classes.
+  This file exists specifically to stop visual drift across screens — treat it as
+  fixed template, not a style suggestion to reinterpret.
 
 NON-NEGOTIABLE RULES (apply to every prompt below, don't ask permission each time):
 1. Every PDO query uses prepared statements with bound parameters. No exceptions.
@@ -428,6 +434,57 @@ Build email notifications per Tech Spec §15, using PHPMailer + Zoho Mail SMTP
 - [ ] Submitting a ₦300,000 expense sends an email to the correct GM
 - [ ] A deliberately broken SMTP config (wrong password) doesn't prevent the underlying expense/top-up action from completing — check storage/logs/ shows the failure instead
 
+### Prompt 2.7 — Web Push Notifications
+
+```
+Build Web Push per Tech Spec §15a, as a SECOND channel alongside Prompt 2.6's
+email notifications — not a replacement. Same trigger events (expense enters
+approval queue, expense rejected, top-up approved/rejected).
+
+1. composer require minishlink/web-push. Generate a VAPID key pair, add
+   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY to .env.example (placeholders) and to
+   your local .env (real values).
+
+2. push_subscriptions table already exists in schema.sql §10a — build:
+   - POST /push/subscribe endpoint: accepts {endpoint, keys: {p256dh, auth}}
+     from the logged-in user's session, upserts a row keyed on endpoint
+   - app/core/PushNotifier.php: send($userId, $title, $body, $url) — fetches
+     all subscriptions for that user, sends via minishlink/web-push, deletes
+     the row on a 410/404 response (expired subscription), logs other failures
+     to storage/logs/ without throwing (same non-blocking discipline as email)
+
+3. Client-side: read UI Component Guide §9c for the exact opt-in banner markup.
+   Implement enablePushNotifications() (requests Notification permission on
+   click, subscribes via pushManager.subscribe with the VAPID public key,
+   POSTs the subscription to /push/subscribe) and dismissNotificationBanner()
+   (stores a dismissal timestamp in localStorage, re-offer after 14 days —
+   this is a UI-preference nicety, localStorage is fine here specifically,
+   don't treat it as a pattern to reuse for anything financial).
+
+4. Add a push event listener to public_html/sw.js (self.registration.showNotification)
+   and a notificationclick listener that focuses an existing tab or opens the
+   notification's url — additive to the existing app-shell caching logic in
+   that file, don't disturb it.
+
+5. On iOS specifically: check matchMedia('(display-mode: standalone)') and
+   swap the banner copy per §9c's iOS variant if the app isn't installed to
+   the home screen, since Web Push silently doesn't work there otherwise.
+
+6. Wire PushNotifier::send() into the same trigger points Prompt 2.6 already
+   added for email — same events, parallel call, not a replacement.
+
+A push notification is a nudge with a deep link only — it must NEVER carry an
+action button that approves/rejects directly. Tapping it opens the app to the
+relevant expense, where the normal Permission::require()-gated flow takes over.
+```
+
+**Acceptance criteria:**
+- [ ] Clicking "Enable" on the opt-in banner successfully creates a push_subscriptions row after granting browser permission
+- [ ] Submitting a ₦300,000 expense triggers both an email AND a push notification to the correct GM
+- [ ] Clicking a push notification opens the app directly to that expense, not just the homepage
+- [ ] Manually revoking notification permission in the browser, then triggering another push, results in the stale subscription row being deleted (test by checking the 410 response handling, not just "no crash")
+- [ ] On iOS in a non-installed Safari tab, the banner shows the "install first" copy instead of attempting a subscription that would silently fail
+
 ---
 
 ## Phase 3 — Invoicing, Payroll & Reporting
@@ -491,6 +548,38 @@ Build the reporting suite per PRD §6.7 and Tech Spec §10, §14:
 - [ ] PDF export renders correctly (not default Times New Roman dompdf styling) and is genuinely readable when printed
 - [ ] Every report correctly flags historical-data contribution, not just the expense list screens
 
+### Prompt 3.3a — Fund Ledger report + Excel export (added post-build, per direct feedback)
+
+```
+Two additions to the reporting suite per Tech Spec §14a and §14b:
+
+1. Fund Ledger report: a new report, NOT filtered by department (deliberately —
+   this is the one report that shows everything in one place). Full chronological
+   list of every approved/paid expense and every approved top-up, interleaved by
+   date, with a running balance column computed via the SQL window function
+   given in Tech Spec §14a — don't recalculate the running balance in a PHP loop,
+   use the window function so the balance math has one source of truth same as
+   everywhere else in the app. Date-range selector like every other report.
+   backfilled_badge() on historical rows, same as elsewhere.
+
+2. composer require phpoffice/phpspreadsheet. Add an "Export Excel" action
+   alongside every existing "Export PDF" action (Statement of Expenditure, P&L,
+   cash flow, departmental expenses, budget vs actual, receivables, payables,
+   and the new Fund Ledger) — both formats consume the SAME underlying data-fetch
+   method per report, never two separately-derived versions of the same numbers.
+   Basic formatting: bold header row, currency format on amount columns,
+   auto-sized columns, report title + date range above the table.
+
+Fix the $companyName warning from Prompt R.5 first if it hasn't been fixed yet —
+the new Excel renderers will hit the same settings-fetching code path.
+```
+
+**Acceptance criteria:**
+- [ ] Fund Ledger shows expenses from every department in one list, not filtered to any single one
+- [ ] Running balance shown per row matches a hand-recalculation for at least 5 consecutive rows you check manually
+- [ ] Excel export opens cleanly in actual spreadsheet software (not just "downloads without erroring") for at least 3 different reports, with currency formatting visibly applied
+- [ ] PDF and Excel exports of the same report show identical totals — since both come from the same data-fetch, a mismatch would mean something is actually querying differently between the two, not just a formatting difference
+
 ### Prompt 3.4 — PWA polish
 
 ```
@@ -521,7 +610,143 @@ silently.
 
 ---
 
-## After Phase 3: final pass
+## Remediation — Retrofit Phase 1 screens to the UI Component Guide
+
+Run this before continuing to Phase 2 if Phase 1 screens don't currently follow `DOTT-TV-Finance-System-UI-Component-Guide.md` (e.g. inconsistent spacing, content not centered, ad-hoc card/button/badge markup that differs screen to screen).
+
+### Prompt R.1 — UI conformance retrofit
+
+```
+Read DOTT-TV-Finance-System-UI-Component-Guide.md in full before touching any file.
+
+Go through every view built in Phase 1 (auth/login, dashboard, settings screens,
+expense entry, historical bulk entry, fund top-up form) and bring each one into
+conformance with the UI Component Guide:
+
+1. Wrap every page's content in the Page Shell pattern from §1 (max-w-6xl mx-auto
+   for standard pages, max-w-md mx-auto nested inside for the login page, max-w-2xl
+   for single-entity forms like expense entry) — this is the fix for inconsistent
+   centering.
+2. Replace any hand-rolled card markup with the exact Card pattern from §3.
+3. Replace any hand-rolled button markup with the exact Button patterns from §4.
+4. Replace any inline status-string rendering with the status_badge() partial
+   from §5 — build it as a real shared PHP function if it doesn't exist yet,
+   don't inline the color-mapping logic per screen.
+5. Replace any hand-rolled dashboard KPI markup with the Metric Card pattern
+   from §6, built as one reusable partial, not per-widget markup.
+6. Check every color and spacing value against §10's rules — flag (don't
+   silently "fix" without listing) any raw hex values or off-scale spacing
+   you find, since some of those might be intentional and worth confirming
+   with me before changing.
+
+Report back: which screens you changed, what specifically was off before
+(e.g. "expense form had no max-width wrapper, content stretched full width"),
+and any §10 violations you flagged but didn't change.
+```
+
+**Acceptance criteria:**
+- [ ] Every Phase 1 screen visually matches the others — same card style, same button style, same badge style, no screen looks like it was built by a different person
+- [ ] Content is centered with consistent margins on a wide monitor, not stretched edge-to-edge or flush against the sidebar
+- [ ] The status badge and metric card are each a single shared component used everywhere, not reimplemented per screen
+
+### Prompt R.2 — Login screen to canonical Auth Card
+
+```
+Read DOTT-TV-Finance-System-UI-Component-Guide.md §1a (Auth Card) before touching
+anything.
+
+Replace the current login screen (app/views/auth/login.php) with the exact markup
+in §1a — full-canvas centered card, no sidebar, matching structure and copy shown.
+
+Explicitly do NOT add: a "keep me signed in" checkbox, Google/GitHub/SSO buttons,
+a "Register here" link, or a working "Forgot password?" link — §1a's "Deliberately
+excluded" note explains why each of these doesn't belong in this app yet. If you
+think one of them should exist, flag it back to me rather than adding it.
+
+Wire the password visibility toggle (the eye icon) via Alpine.js x-data="{ showPassword: false }"
+on the form wrapper, toggling the password input's type attribute between 'password'
+and 'text'.
+```
+
+**Acceptance criteria:**
+- [ ] Login screen visually matches §1a exactly — centered card, no sidebar, correct copy
+- [ ] None of the four excluded elements were added
+- [ ] Password visibility toggle works via Alpine, no page reload
+
+
+### Prompt R.3 — Self-mailing audit verification script
+
+```
+Update scripts/verify_audit_log.php per Deployment Handbook Part 6: instead of
+relying on cPanel's default cron-output email, the script should look up the
+Super Admin's email directly from the users table (WHERE role = super_admin,
+status = 'active' — handle the case of multiple Super Admins by emailing all
+of them, not just the first) and send its result via the same PHPMailer/Zoho
+SMTP setup already built in Prompt 2.6, rather than a second mail-sending path.
+
+The email should clearly state: pass/fail, and if failed, which audit_log row
+id broke the hash chain first. Keep it plain text, consistent with the other
+notification templates from Prompt 2.6.
+
+Test by running the script manually via SSH/CLI and confirming the email
+arrives at the actual Super Admin address, not just that the script exits
+without errors.
+```
+
+**Acceptance criteria:**
+- [ ] Running the script manually sends a real email to the Super Admin's actual address (not the cPanel account's generic contact email)
+- [ ] A deliberately tampered audit_log row (edited directly via phpMyAdmin) causes the email to report failure with the specific row id
+- [ ] Multiple Super Admin users (if more than one exists) all receive the email, not just one
+
+
+### Prompt R.4 — Resolve audit log foreign-key IDs to names
+
+```
+Read DOTT-TV-Finance-System-UI-Component-Guide.md §8b again — it's been updated
+with a resolve_audit_value() helper and audit_diff_view()'s signature has changed
+to accept the PDO connection as its first argument.
+
+Add resolve_audit_value() alongside audit_diff_view() (same file/location the
+latter already lives in). Update every call site of audit_diff_view() to pass
+$db as the new first argument.
+
+Test against: an approval action (approver_id resolves to the approving user's
+actual name), a department edit in Settings (department_id resolves to the
+department name), and a role/approval-rule change (role_id resolves to the
+role name). Confirm a value that ISN'T a known foreign key (e.g. an amount or
+a free-text description) still displays as-is, unaffected.
+
+Also confirm: if a referenced record was since deleted (e.g. a department that
+no longer exists), the diff falls back to showing the raw id rather than
+erroring or showing a blank value.
+```
+
+**Acceptance criteria:**
+- [ ] `approved_by`, `created_by`, `requested_by` and similar `*_by` fields show the actual person's name, not a bare number
+- [ ] `department_id`, `category_id`, `fund_account_id`, `role_id` all resolve to their real names
+- [ ] Non-FK fields (amounts, dates, free text) are unaffected — still shown as plain values
+- [ ] A deleted-record edge case falls back gracefully to the raw id, no error
+
+### Prompt R.5 — Fix undefined $companyName in PDF report layout
+
+```
+app/views/reports/pdf/layout.php references $companyName but it's undefined
+(PHP warning on line 65). Find wherever this view is rendered (likely
+ReportController's PDF export action) and confirm it fetches the company_name
+value from the settings table (schema.sql seeds this as 'DOTT TV') and passes
+it into the view — check whatever pattern is already used elsewhere for reading
+settings values (Settings module from Prompt 1.3 already has this logic, reuse
+it rather than writing a second way to read settings).
+
+Grep app/views/reports/pdf/ for any other variables used but not obviously
+passed in, in case this is a broader pattern issue rather than a one-off — fix
+all instances found, not just $companyName.
+```
+
+**Acceptance criteria:**
+- [ ] No PHP warnings when generating any PDF report
+- [ ] Company name renders correctly on the PDF header
+
 
 ### Prompt 4.1 — Security & coverage audit
 

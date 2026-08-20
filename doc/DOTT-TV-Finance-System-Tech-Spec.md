@@ -49,31 +49,37 @@ This keeps the mental model close to plain PHP-with-organization rather than fra
 
 ## 4. Application Structure
 
+**Deployment shape note**: this app is served at `dotttv.tv/dotttvfinance` — a subfolder of the main domain, not a dedicated subdomain. That changes how `app/`, `storage/`, and `.env` are protected (see below) but not the internal folder organization itself.
+
 ```
-/ (cPanel account root)
-├── public_html/                  → web root (subdomain doc root, e.g. finance.dotttv.tv)
-│   ├── index.php                 → front controller (the ONLY PHP entry point)
-│   ├── .htaccess                 → rewrite all requests to index.php
-│   ├── manifest.json
-│   ├── sw.js                     → service worker
-│   └── assets/
-│       ├── css/app.css           → compiled Tailwind output
-│       ├── js/app.js
-│       └── icons/                → PWA icons, various sizes
+dotttvfinance/                      → project root, deployed as one unit into
+│                                       public_html/dotttvfinance/ on the server
+├── .htaccess                       → denies direct access to this level, rewrites
+│                                       all other requests into public_html/
 │
-├── app/                          → OUTSIDE web root — not reachable via URL
+├── public_html/                    → the actual front-controller + assets
+│   ├── index.php                   → front controller (the ONLY PHP entry point)
+│   ├── .htaccess                   → rewrite all requests to index.php
+│   ├── manifest.json
+│   ├── sw.js                       → service worker
+│   └── assets/
+│       ├── css/app.css             → compiled Tailwind output
+│       ├── js/app.js
+│       └── icons/                  → PWA icons, various sizes
+│
+├── app/                            → protected by the root .htaccess (see note below)
 │   ├── config/
-│   │   ├── config.php            → loads .env, defines constants
+│   │   ├── config.php              → loads .env, defines constants
 │   │   └── routes.php
 │   ├── core/
-│   │   ├── Database.php          → PDO singleton
+│   │   ├── Database.php            → PDO singleton
 │   │   ├── Router.php
-│   │   ├── Auth.php              → session mgmt, login/logout
-│   │   ├── Permission.php        → RBAC guard (see §8)
-│   │   ├── ApprovalEngine.php    → tier lookup + chain generation (see §9)
-│   │   ├── AuditLogger.php       → hash-chain writer (see §13)
+│   │   ├── Auth.php                → session mgmt, login/logout
+│   │   ├── Permission.php          → RBAC guard (see §8)
+│   │   ├── ApprovalEngine.php      → tier lookup + chain generation (see §9)
+│   │   ├── AuditLogger.php         → hash-chain writer (see §13)
 │   │   ├── Validator.php
-│   │   └── View.php              → minimal template renderer (plain PHP includes, no template DSL)
+│   │   └── View.php                → minimal template renderer (plain PHP includes, no template DSL)
 │   ├── controllers/
 │   │   ├── AuthController.php
 │   │   ├── DashboardController.php
@@ -94,18 +100,29 @@ This keeps the mental model close to plain PHP-with-organization rather than fra
 │       ├── dashboard/, expenses/, fund_topups/, payments/,
 │       │   invoices/, payroll/, reports/, settings/, audit_log/
 │
-├── storage/                      → OUTSIDE web root
+├── storage/                        → protected by the root .htaccess (see note below)
 │   ├── uploads/
 │   │   ├── receipts/
 │   │   └── vouchers/
-│   └── logs/                     → PHP error logs, not audit_log (that's in the DB)
+│   └── logs/                       → PHP error logs, not audit_log (that's in the DB)
 │
-├── vendor/                       → Composer packages
+├── vendor/                         → Composer packages
 ├── composer.json
-└── .env                          → DB credentials, SMTP credentials, app secrets (never committed)
+└── .env                            → DB credentials, SMTP credentials, app secrets (never committed)
 ```
 
-Keeping `app/` and `storage/` outside `public_html/` is the single most important structural decision on shared hosting — it's the difference between a misconfigured server exposing your `.env` file to the internet and it being physically unreachable by URL regardless of misconfiguration.
+**On `app/`, `storage/`, and `.env` protection — read this carefully, it's a real trade-off, not a formality.**
+
+With a dedicated subdomain (the original plan), these three would sit physically outside any web-servable document root — Apache never serves that directory at all, so no `.htaccess` rule, correct or misconfigured, changes whether they're reachable. That's a *structural* guarantee.
+
+With this subfolder deployment, `app/` and `storage/` are inside a web-servable tree. What keeps them unreachable is the root `.htaccess`'s `Require all denied` rule combined with the rewrite that forwards all other requests into `public_html/`. That's a **config-correctness guarantee, not a structural impossibility** — it depends on that `.htaccess` file being present, uncorrupted, and actually working on whatever Apache config the host runs, rather than on physical placement. This is standard practice for subfolder deployments and is fine to ship with, but it means the verification step below isn't optional busywork — it's the thing actually standing between this app and its most sensitive files being reachable by URL.
+
+**Before trusting this in any environment** (local XAMPP `htdocs` subfolder or live cPanel), confirm these three URLs all return 403/404, never actual file content:
+- `.../dotttvfinance/app/config/config.php`
+- `.../dotttvfinance/.env`
+- `.../dotttvfinance/storage/uploads/`
+
+Test locally first, then re-test the same three URLs against the live cPanel URL after every deploy that touches the root `.htaccess` — a shared-hosting Apache config can behave differently from a local setup, so a local pass doesn't guarantee a production pass. This check is also in the Deployment Handbook's Part 2 (initial setup) and Part 7 (post-deploy checklist) for the same reason — it's worth repeating rather than assuming it still holds.
 
 ---
 
@@ -224,11 +241,45 @@ The **Bulk Historical Entry** screen (PRD §5) is a dedicated controller/view, n
 
 ---
 
-## 14. Reporting & PDF Export
+## 14. Reporting & PDF/Excel Export
 
-- Reports render as HTML first (fast to build, easy to debug), with a "Export PDF" action that passes the same rendered view through `dompdf` server-side.
+- Reports render as HTML first (fast to build, easy to debug), with an "Export PDF" action that passes the same rendered view through `dompdf` server-side, and a separate "Export Excel" action (§14a) — same underlying data, two independent renderers, not one output converted into the other.
 - The Statement of Expenditure export specifically pulls: opening balance (§10), funds received in range, approved expenditure in range, outstanding liabilities (unpaid approved expenses), closing balance — matching the format already requested from Ifeoma in the PRD.
 - Historical/backfilled entries are visually flagged in every report (a small badge) so GM/Chairman always know which figures were entered in real time vs. reconstructed from the paper book.
+
+### 14a. Fund Ledger — all-departments itemized transaction history with running balance
+
+Added post-Phase-3-build per direct feedback (PRD §6.7). Unlike every other report, this one is a single continuous list, not a summary — every approved/paid expense and every approved top-up, interleaved chronologically, with the balance recalculated after each row. Compute the running balance in SQL via a window function (MySQL 8 supports this — no need for an app-layer loop recalculating row by row, which is slower and a place for off-by-one bugs to creep in):
+
+```sql
+SELECT
+    ledger.*,
+    SUM(amount_in - amount_out) OVER (ORDER BY date, created_at ROWS UNBOUNDED PRECEDING) AS running_balance
+FROM (
+    SELECT date, created_at, 'topup' AS type, NULL AS document_no, NULL AS payee,
+           NULL AS department_id, reference AS description, amount AS amount_in, 0 AS amount_out, is_historical
+    FROM fund_topups
+    WHERE (status = 'approved' OR is_historical = 1) AND date BETWEEN :start AND :end
+
+    UNION ALL
+
+    SELECT date, created_at, 'expense' AS type, document_no, payee,
+           department_id, description, 0 AS amount_in, amount AS amount_out, is_historical
+    FROM expenses
+    WHERE (status IN ('approved','paid') OR is_historical = 1) AND date BETWEEN :start AND :end
+) AS ledger
+ORDER BY date, created_at;
+```
+
+No `department_id` filter on this query — that's the point of this report. `backfilled_badge()` (UI Component Guide §5a) applies per row same as everywhere else historical data appears.
+
+### 14b. Excel Export
+
+**Library**: `phpoffice/phpspreadsheet` (Composer, pure PHP, no external binary or Node dependency — heavier install than `dompdf` but still a clean shared-hosting fit).
+
+Every report that has a PDF export gets a matching Excel export, built from the same underlying query result — never re-derive the numbers separately for each format, that's the same "two sources of truth" risk already avoided elsewhere (fund balance, audit log). One data-fetching method per report, two renderer functions (`renderPdf($data)`, `renderExcel($data)`) consuming the same array.
+
+Basic formatting worth doing (not just a raw data dump): bold header row, currency number format on amount columns, auto-sized columns, the report title + date range in a merged cell above the table. Doesn't need to match the PDF's exact visual design — it's a working document for Ifeoma/an auditor, not a presentation artifact.
 
 ---
 
@@ -239,7 +290,33 @@ Email via PHPMailer + Zoho Mail SMTP (already selected for DOTT TV's infrastruct
 - An expense is rejected (email to the Accountant).
 - A fund top-up is approved/rejected (email to the requesting Accountant).
 
-Kept intentionally minimal in v1 — no in-app notification center, no SMS, no push notifications. Email is sufficient for a 4-person user base and avoids adding infrastructure.
+**Revised**: Web Push (§15a) is added as a second, parallel channel for the same trigger events — not a replacement for email. Email remains the reliable fallback (works even if push permission was never granted or a subscription has gone stale); push adds immediacy for GM/Chairman who may not check email promptly, which directly serves the PRD's goal of approval "from anywhere."
+
+---
+
+## 15a. Web Push Notifications
+
+**Library**: `minishlink/web-push` (Composer, pure PHP, implements the Web Push protocol + VAPID — no Node.js dependency, consistent with the rest of the stack).
+
+**One-time setup**: generate a VAPID key pair (`vendor/bin/web-push-vapid-keys` or the library's key-gen helper), store both in `.env` as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — same treatment as every other secret per §19, never committed.
+
+**Subscription flow** (client-side):
+1. On login (not on PWA install — see the permission-timing note below), check `Notification.permission`. If `'default'` (never asked), show the dismissible in-app banner from UI Component Guide's Notification Opt-In pattern rather than requesting permission automatically.
+2. On the banner's "Enable" button click (a real user gesture — required for the browser to honor the request without flagging it as abusive): call `Notification.requestPermission()`, then on `'granted'`, register via `navigator.serviceWorker.ready` → `pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VAPID_PUBLIC_KEY })`.
+3. POST the resulting subscription object (`endpoint`, `keys.p256dh`, `keys.auth`) to a new endpoint (`POST /push/subscribe`), which upserts a row in `push_subscriptions` (schema.sql §10a) keyed to the logged-in user and that specific `endpoint`.
+4. If the user dismisses the banner instead of enabling, don't re-show it every login — store the dismissal (a simple `localStorage` flag is fine here specifically, since it's a UI-preference nicety, not financial data; re-offer it once after e.g. 14 days, not every session).
+
+**On the permission-timing question directly**: there is no browser API to auto-trigger the permission prompt "on PWA install" — `Notification.requestPermission()` requires a user gesture in practice (and unsolicited calls on page load are actively penalized by Chrome's abusive-permission-request heuristics, which can get a site's ability to prompt suppressed entirely). The `appinstalled` event can be listened for to know installation happened, but the actual permission ask still needs to wait for the user to click something. iOS Safari has an additional hard requirement: Web Push only works at all if the PWA was added to the home screen first (iOS 16.4+) — a push subscription attempt in a regular Safari tab silently fails on iOS, so the opt-in banner copy should account for this (e.g. "Install the app first" messaging if `matchMedia('(display-mode: standalone)')` is false on iOS).
+
+**Sending a push** (server-side, `PushNotifier::send($userId, $title, $body, $url)`):
+1. Fetch all `push_subscriptions` rows for `$userId`.
+2. For each, call the library's send method with the VAPID keys and the payload (title, body, and a `url` field the service worker uses to focus/open the right page on click).
+3. On a `410 Gone` or `404` response (subscription expired/revoked), delete that `push_subscriptions` row — don't retry it again, it's dead.
+4. Same try/catch-and-log discipline as email (§15's existing pattern): a push failure never blocks the underlying expense/top-up action, and failures log to `storage/logs/`, not to the user as an error.
+
+**Service worker** (`public_html/sw.js`): add a `push` event listener that calls `self.registration.showNotification(title, { body, data: { url } })`, and a `notificationclick` listener that focuses an existing app tab if one's open, or opens `data.url` in a new one otherwise. This is additive to the app-shell caching logic already in §17 — same file, separate event listeners, no conflict.
+
+**What a push notification does NOT do**: it's a nudge with a deep link, not an action button that approves/rejects directly from the notification. Tapping it opens the app to the relevant expense, where the normal `Permission::require()`-gated approve/reject flow takes over — a push payload is never trusted as an authorization surface.
 
 ---
 
@@ -276,7 +353,7 @@ Kept intentionally minimal in v1 — no in-app notification center, no SMS, no p
 
 ## 19. Environment & Configuration
 
-- `.env` (via `vlucas/phpdotenv`) holds: DB credentials, SMTP credentials, app secret key, environment flag (`production`/`development`).
+- `.env` (via `vlucas/phpdotenv`) holds: DB credentials, SMTP credentials, VAPID key pair (§15a), app secret key, environment flag (`production`/`development`).
 - `.env` is gitignored; a `.env.example` with placeholder values is committed for setup reference.
 - `app/config/config.php` loads `.env` and defines any derived constants — the only file that reads environment variables directly, so credentials access is centralized and auditable.
 
@@ -284,10 +361,10 @@ Kept intentionally minimal in v1 — no in-app notification center, no SMS, no p
 
 ## 20. Deployment (cPanel)
 
-- Subdomain (e.g. `finance.dotttv.tv`) points its document root to `public_html/` as structured in §4 — **not** the account's main `public_html`, keeping this app isolated from the Staff Hub portal's deployment.
-- Composer dependencies installed via cPanel's "Setup PHP App" tool if it exposes Composer, or via SSH if available on the plan; if neither is available, `vendor/` is built locally and uploaded (less ideal, but a valid fallback on more restrictive shared hosting).
+- Served at `dotttv.tv/dotttvfinance` — a subfolder of the account's main domain, deployed as one unit into `public_html/dotttvfinance/`. This keeps the app isolated from the Staff Hub portal (a separate subfolder or subdomain of its own) without needing a dedicated subdomain for this project.
+- `app/`, `storage/`, and `.env` are **not** physically outside the web root in this layout — see §4's note on this. They're protected by the root `.htaccess`'s deny rule, which is a config-correctness guarantee, not a structural one. The three-URL verification check in §4 applies here too, on every deploy that touches the root `.htaccess`.
+- Composer dependencies installed via cPanel's "Setup PHP App" tool if it exposes Composer, or via SSH if available on the plan; if neither is available, `vendor/` is built locally (or in CI) and uploaded as part of the deploy — see `DOTT-TV-Finance-System-Deployment-Handbook.md` for the actual GitHub Actions workflows (SSH+rsync or FTP/SFTP, depending on what the hosting plan supports).
 - Database: dedicated MySQL database + user created through cPanel's MySQL Databases tool, credentials placed in `.env`, `schema.sql` run once via phpMyAdmin or the `mysql` CLI if SSH access exists.
-- Deployment method: Git-based deploy if the cPanel plan supports "Git Version Control," otherwise a manual zip-upload-and-extract workflow — either way, `app/`, `storage/`, and `.env` must land outside the subdomain's public document root.
 - A cron job (cPanel's Cron Jobs tool) runs `scripts/verify_audit_log.php` monthly and emails the result to the Super Admin — a scheduled tamper check rather than something that only gets run if someone remembers to.
 
 ---
@@ -325,10 +402,21 @@ Given a solo builder and a small, well-defined user base, full test-driven devel
 |---|---|
 | `vlucas/phpdotenv` | `.env` loading |
 | `dompdf/dompdf` | PDF export for reports |
+| `phpoffice/phpspreadsheet` | Excel export for reports (§14b) |
 | `phpmailer/phpmailer` | SMTP email via Zoho Mail |
+| `minishlink/web-push` | Web Push notifications (§15a) |
 | `phpunit/phpunit` (dev only) | Unit tests |
 
 Kept deliberately minimal — every dependency is a thing that can break on a shared-hosting Composer install, so each addition should earn its place.
+
+**Non-Composer frontend dependencies** (CDN `<script>` tags, not installed via Composer):
+
+| Dependency | Purpose | Notes |
+|---|---|---|
+| Alpine.js | Reactive UI state, transitions | Already specified in §3 |
+| SweetAlert2 | Confirmation modals, toast notifications | UI Component Guide §9b — replaces all raw `alert()`/`confirm()` browser dialogs |
+
+Icons (Lucide) are **not** a runtime dependency at all — they're a self-hosted static SVG sprite file built once (UI Component Guide §9a), not a library loaded on every request.
 
 ---
 

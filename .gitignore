@@ -1,0 +1,14 @@
+/vendor/
+/.env
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/uploads/*
+!/storage/uploads/.gitkeep
+!/storage/uploads/receipts/.gitkeep
+!/storage/uploads/vouchers/.gitkeep
+/storage/rate_limits/*
+!/storage/rate_limits/.gitkeep
+/node_modules/
+/build/tailwind/tailwindcss
+.DS_Store
+*.log

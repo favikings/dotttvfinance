@@ -21,7 +21,7 @@ Not called out as its own phase in the PRD, but everything in Phase 1 depends on
 - [ ] `composer init`, add dependencies from Tech Spec §24 (`vlucas/phpdotenv`, `dompdf/dompdf`, `phpmailer/phpmailer`, `phpunit/phpunit` dev)
 - [ ] Create folder structure exactly per Tech Spec §4 (`public_html/`, `app/`, `storage/` — confirm `app/` and `storage/` sit outside the subdomain's web root)
 - [ ] `.env.example` with placeholder DB/SMTP/secret keys; real `.env` created locally, never committed
-- [ ] Create MySQL database + user via cPanel, run `schema.sql` in full, confirm all 17 tables + `fund_balances` view + seed data landed correctly
+- [ ] Create MySQL database + user via cPanel, run `schema.sql` in full, confirm all 18 tables + `fund_balances` view + seed data landed correctly
 - [ ] `Database.php` PDO singleton, confirm a test query works against the seeded `roles` table
 - [ ] Set up Tailwind (standalone CLI) with the Horizon Finance design tokens — see **Design System Integration** below
 - [ ] Build the base app shell layout (`views/layouts/app.php`): fixed 260px navy sidebar (`primary` token) + fluid light-canvas content area (`surface` token), per the design system's "Deep Navigation / Light Content" pattern
@@ -155,6 +155,7 @@ Pull the design tokens from `design-system-dotttv.md`'s frontmatter directly int
 **Notifications**
 - [ ] Zoho Mail SMTP config via PHPMailer
 - [ ] Email triggers: expense enters approval queue, expense rejected, top-up approved/rejected (Tech Spec §15)
+- [ ] Web Push: VAPID keys generated + stored in `.env`, `push_subscriptions` table, subscription flow, opt-in banner (Tech Spec §15a, UI Component Guide §9c) — same trigger events as email, as a parallel channel not a replacement
 
 **Phase 2 test gate**
 - [ ] A ₦300,000 expense correctly routes to GM only; a ₦600,000 expense correctly routes to GM then Chairman
@@ -182,6 +183,8 @@ Pull the design tokens from `design-system-dotttv.md`'s frontmatter directly int
 - [ ] P&L, cash flow, departmental expenses, budget vs. actual, receivables, payables
 - [ ] PDF export via dompdf for all reports, styled consistently with the Horizon Finance design tokens (not default dompdf styling)
 - [ ] "Backfilled" badges visible on any historical data feeding into a report
+- [ ] Fund Ledger: full chronological expense + top-up history, all departments, running balance via SQL window function (Tech Spec §14a)
+- [ ] Excel export via PhpSpreadsheet for every report that has a PDF export, sharing the same underlying data-fetch (Tech Spec §14b)
 
 **PWA polish**
 - [ ] Service worker: proper app-shell cache-first strategy, cache-busting on deploy (Tech Spec §17)
