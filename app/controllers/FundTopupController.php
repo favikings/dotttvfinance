@@ -86,7 +86,7 @@ class FundTopupController
             : [];
 
         View::render('fund_topups/index', [
-            'title'      => 'Fund Top-Ups',
+            'title'      => 'Fund Account',
             'topups'     => $topups,
             'pending'    => $pending,
             'canCreate'  => Permission::check($user, 'fund_topups', 'create'),
@@ -103,7 +103,7 @@ class FundTopupController
         $this->guard('create');
 
         View::render('fund_topups/create', [
-            'title' => 'Request Fund Top-Up',
+            'title' => 'Request Fund Account Top-Up',
             'today' => date('Y-m-d'),
         ]);
     }

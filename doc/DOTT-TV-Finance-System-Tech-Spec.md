@@ -135,6 +135,23 @@ Test locally first, then re-test the same three URLs against the live cPanel URL
 - Every request re-validates the session against the `users` table (checks `status = 'active'`) — a deactivated user is locked out immediately, not just at their next login.
 - No "remember me" persistent cookies in v1 — re-authentication on session expiry is a deliberate friction point for a finance tool.
 
+### 5a. Self-Service Password Change
+
+All four roles (Super Admin included — no reason to exclude the role that manages everyone else's accounts from managing their own password) can change their own password from an "Account" menu, without needing Super Admin intervention.
+
+**This is NOT an RBAC-gated action.** It doesn't need a `permissions`/`role_permissions` entry — `Permission::require()` checks access to *other* people's/company data by module, whereas this operates only on the logged-in user's own record. The only check needed is "is this the currently authenticated user's own account," not a module.action lookup.
+
+**Validation, in order:**
+1. Current password must verify (`password_verify()`) before anything else — this is the actual security control, since it confirms the person at the keyboard actually knows the existing password, not just that they have an active session (someone briefly at an unlocked, unattended device shouldn't be able to lock the real owner out).
+2. New password: minimum 8 characters (no policy previously existed anywhere in the spec — resolving that gap now with a sane baseline, not an elaborate complexity requirement that just encourages sticky notes).
+3. New password + confirmation field must match.
+
+**On success:**
+- `session_regenerate_id(true)` again, same as login — cheap extra safety.
+- Audit log entry: `action = 'password_changed'`, `entity_type = 'users'`, `entity_id = <own id>`. **`before_json`/`after_json` are NULL or contain only a timestamp — the actual password, old or new, is NEVER written to `audit_log` in any form**, hashed or otherwise. The point of the log entry is proving *when* a change happened, not what changed to.
+- Current session stays valid (no forced re-login) — regenerating the session id is sufficient; this isn't solving "an attacker has an active session," it's solving "someone doesn't know the real password."
+- Known accepted limitation: other active sessions for the same user (e.g. logged in on a second device) are NOT force-invalidated, since there's no server-side session store to reach into — only PHP native file-based sessions per this section's existing design. Not worth adding a full session-tracking table for a 4-person app; flagging it here so it's a documented trade-off, not a silent gap.
+
 ---
 
 ## 6. Authorization (RBAC) Implementation

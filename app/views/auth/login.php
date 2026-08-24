@@ -11,7 +11,8 @@
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="<?= View::e(url('/login')) ?>" x-data="{ showPassword: false }">
+        <form method="POST" action="<?= View::e(url('/login')) ?>"
+              x-data="{ showPassword: false, loading: false }" x-on:submit="loading = true">
             <?= Csrf::field() ?>
             <?php if (!empty($redirect)): ?>
                 <input type="hidden" name="redirect" value="<?= View::e($redirect) ?>">
@@ -49,10 +50,15 @@
                 </button>
             </div>
 
-            <button type="submit"
+            <button type="submit" :disabled="loading"
                     class="w-full py-3 rounded bg-primary text-on-primary text-sm font-semibold
-                           hover:opacity-90 transition-opacity mb-4.5">
-                Sign in
+                           hover:opacity-90 transition-opacity mb-4.5 disabled:opacity-60 disabled:cursor-not-allowed
+                           flex items-center justify-center gap-2">
+                <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <span x-text="loading ? 'Signing in...' : 'Sign in'"></span>
             </button>
         </form>
 

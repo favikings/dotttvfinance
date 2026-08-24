@@ -110,6 +110,12 @@ $router->get('/login', 'AuthController@showLogin', public: true);
 $router->post('/login', 'AuthController@login', public: true);
 $router->post('/logout', 'AuthController@logout');
 
+// Self-service password change (Build Prompt 1.7 / Tech Spec §5a) — not
+// Permission-gated, just "does this session belong to the account being
+// modified." Any authenticated user reaches it.
+$router->get('/account/password', 'AccountController@showPassword');
+$router->post('/account/password', 'AccountController@updatePassword');
+
 // Settings (Super Admin only — every action guarded in the controller)
 $router->get('/settings', 'SettingsController@index');
 $router->get('/settings/departments', 'SettingsController@departments');

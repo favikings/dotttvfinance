@@ -11,7 +11,8 @@
     <!-- UI Component Guide §8a — single x-data scope wraps the whole table AND both buttons. -->
     <form method="post" action="<?= View::e(url('/historical-entry/expenses')) ?>"
           x-ref="form"
-          x-data="historicalExpenseForm()">
+          x-data="historicalExpenseForm()"
+          x-on:submit="loading = true">
         <?= Csrf::field() ?>
 
         <div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
@@ -93,9 +94,13 @@
                     class="border border-outline text-on-surface font-medium text-sm px-4 py-2.5 rounded hover:bg-surface-container transition-colors">
                 + Add Row
             </button>
-            <button type="button" x-on:click="saveAll()"
-                    class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity">
-                Save All (<span x-text="rows.length"></span> <span x-text="rows.length === 1 ? 'row' : 'rows'"></span>)
+            <button type="button" x-on:click="saveAll()" :disabled="loading"
+                    class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                <span x-text="loading ? 'Saving...' : 'Save All (' + rows.length + ' ' + (rows.length === 1 ? 'row' : 'rows') + ')'"></span>
             </button>
         </div>
     </form>
@@ -105,6 +110,7 @@
     function historicalExpenseForm() {
         return {
             nextId: 1,
+            loading: false,
             rows: [{ id: 0, date: '<?= View::e($today) ?>', document_no: '', payee: '', description: '', department_id: '', amount: '' }],
             addRow() {
                 const id = this.nextId++;

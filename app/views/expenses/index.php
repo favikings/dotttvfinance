@@ -48,7 +48,7 @@
                             <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e($expense['payee']) ?></td>
                             <td class="px-4 py-3 text-on-surface-variant max-w-[240px] truncate"><?= View::e($expense['description']) ?></td>
                             <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e($expense['department_name'] ?? '—') ?></td>
-                            <td class="px-4 py-3 text-on-surface text-right whitespace-nowrap"><?= naira($expense['amount']) ?></td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($expense['amount'], 'debit') ?></td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     <?= status_badge($expense['status']) ?>

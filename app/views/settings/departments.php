@@ -53,7 +53,8 @@
             <?php if ($editDepartment !== null): ?>
                 <h2 class="text-headline-sm mb-1">Edit department</h2>
                 <p class="text-body-md text-on-surface-variant mb-4">Rename "<?= View::e($editDepartment['name']) ?>".</p>
-                <form method="post" action="<?= View::e(url('/settings/departments/update')) ?>">
+                <form method="post" action="<?= View::e(url('/settings/departments/update')) ?>"
+                      x-data="{ loading: false }" x-on:submit="loading = true">
                     <?= Csrf::field() ?>
                     <input type="hidden" name="id" value="<?= (int) $editDepartment['id'] ?>">
                     <div class="mb-4">
@@ -62,9 +63,13 @@
                                required class="w-full px-3 py-2.5 rounded border border-outline bg-surface-container-lowest text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container focus:border-transparent">
                     </div>
                     <div class="flex gap-3">
-                        <button type="submit"
-                                class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity">
-                            Save changes
+                        <button type="submit" :disabled="loading"
+                                class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                            <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            <span x-text="loading ? 'Saving...' : 'Save changes'"></span>
                         </button>
                         <a href="<?= View::e(url('/settings/departments')) ?>"
                            class="border border-outline text-on-surface font-medium text-sm px-4 py-2.5 rounded hover:bg-surface-container transition-colors">
@@ -75,16 +80,21 @@
             <?php else: ?>
                 <h2 class="text-headline-sm mb-1">Add department</h2>
                 <p class="text-body-md text-on-surface-variant mb-4">Departments tag expenses, invoices, and payroll records.</p>
-                <form method="post" action="<?= View::e(url('/settings/departments/create')) ?>">
+                <form method="post" action="<?= View::e(url('/settings/departments/create')) ?>"
+                      x-data="{ loading: false }" x-on:submit="loading = true">
                     <?= Csrf::field() ?>
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-on-surface mb-1.5" for="dept-name">Name</label>
                         <input type="text" id="dept-name" name="name" placeholder="e.g. Newsroom"
                                required class="w-full px-3 py-2.5 rounded border border-outline bg-surface-container-lowest text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container focus:border-transparent">
                     </div>
-                    <button type="submit"
-                            class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity">
-                        Add department
+                    <button type="submit" :disabled="loading"
+                            class="bg-secondary-container text-on-secondary-container font-medium text-sm px-4 py-2.5 rounded hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        </svg>
+                        <span x-text="loading ? 'Adding...' : 'Add department'"></span>
                     </button>
                 </form>
             <?php endif; ?>

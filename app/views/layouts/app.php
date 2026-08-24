@@ -68,16 +68,7 @@
             </nav>
             <?php $currentUser = Auth::user(); ?>
             <?php if ($currentUser): ?>
-                <div class="mx-3 mb-3 flex items-center justify-between gap-2 rounded-md bg-white/5 px-3 py-2.5">
-                    <div class="min-w-0">
-                        <p class="text-body-md truncate"><?= View::e($currentUser['name']) ?></p>
-                        <p class="text-label-sm text-on-primary-container uppercase truncate"><?= View::e($currentUser['role_name'] ?? '') ?></p>
-                    </div>
-                    <form method="post" action="<?= View::e(url('/logout')) ?>">
-                        <?= Csrf::field() ?>
-                        <button type="submit" class="shrink-0 text-label-sm text-on-primary/70 hover:text-on-primary transition-colors">Log out</button>
-                    </form>
-                </div>
+                <?= View::renderPartial('partials/account_menu', ['currentUser' => $currentUser]) ?>
             <?php endif; ?>
 
             <div class="m-3 mb-6 rounded-md bg-white/10 p-4">
@@ -169,16 +160,7 @@
                     <?php endforeach; ?>
                 </nav>
                 <?php if ($currentUser): ?>
-                    <div class="mx-3 mb-3 flex items-center justify-between gap-2 rounded-md bg-white/5 px-3 py-2.5">
-                        <div class="min-w-0">
-                            <p class="text-body-md truncate"><?= View::e($currentUser['name']) ?></p>
-                            <p class="text-label-sm text-on-primary-container uppercase truncate"><?= View::e($currentUser['role_name'] ?? '') ?></p>
-                        </div>
-                        <form method="post" action="<?= View::e(url('/logout')) ?>">
-                            <?= Csrf::field() ?>
-                            <button type="submit" class="shrink-0 text-label-sm text-on-primary/70 hover:text-on-primary transition-colors">Log out</button>
-                        </form>
-                    </div>
+                    <?= View::renderPartial('partials/account_menu', ['currentUser' => $currentUser]) ?>
                 <?php endif; ?>
             </div>
         </div>

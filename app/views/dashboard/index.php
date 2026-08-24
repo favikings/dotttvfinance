@@ -14,7 +14,7 @@
         </div>
     <?php else: ?>
         <div class="flex items-center justify-between gap-3 flex-wrap">
-            <p class="text-label-sm uppercase text-on-surface-variant">Funds Received &amp; Funds Spent period</p>
+            <p class="text-label-sm uppercase text-on-surface-variant">Credit &amp; Debit period</p>
             <form method="get" action="<?= View::e(url('/')) ?>" class="flex items-center gap-2">
                 <label for="period" class="sr-only">Period</label>
                 <select id="period" name="period" onchange="this.form.submit()"
@@ -28,9 +28,9 @@
 
         <?php foreach ($accounts as $account): ?>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <?= metric_card('Current Balance', naira($account['current_balance'])) ?>
-                <?= metric_card('Funds Received', naira($account['total_topups'])) ?>
-                <?= metric_card('Funds Spent', naira($account['total_spent'])) ?>
+                <?= metric_card('Current Balance', format_amount($account['current_balance'], 'neutral')) ?>
+                <?= metric_card('Credit', format_amount($account['total_topups'], 'credit')) ?>
+                <?= metric_card('Debit', format_amount($account['total_spent'], 'debit')) ?>
             </div>
         <?php endforeach; ?>
     <?php endif; ?>
@@ -75,8 +75,8 @@
                                     <p class="text-on-surface-variant text-xs mt-0.5 max-w-[260px] truncate"><?= View::e($row['note']) ?></p>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-4 py-3 text-right whitespace-nowrap <?= $isTopup ? 'text-success' : 'text-on-surface' ?>">
-                                <?= $isTopup ? '+' : '−' ?><?= naira($row['amount']) ?>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <?= $isTopup ? '+' : '−' ?><?= format_amount($row['amount'], $isTopup ? 'credit' : 'debit') ?>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap items-center gap-1.5">

@@ -140,18 +140,71 @@ Active nav state = `bg-white/10` + left border, exactly per design-system-dotttv
 
 ---
 
-## 2. Mobile Shell — Top Bar, Drawer & Bottom Tabs (< 768px)
+## 2a. Account Menu (sidebar footer)
 
-Below `md`, the 260px sidebar in `app/views/layouts/app.php` is hidden and replaced by three fixed pieces. This is the ONLY mobile layout pattern — copy it, don't improvise per-screen variants.
+Sits at the bottom of the sidebar, below the nav items — shows the logged-in user's name/role, opens a small dropdown with Change Password and Logout.
 
-1. **Sticky top bar** — `md:hidden sticky top-0 z-30 bg-primary text-on-primary px-4 py-3`, app name left, a single hamburger button (`#menu` sprite icon) right that sets `drawerOpen = true` on the root `x-data="{ drawerOpen: false }"`.
-2. **Right-side drawer** — `md:hidden fixed inset-0 z-40 bg-black/40`, closes on outside tap (`@click="drawerOpen = false"`); the panel is `absolute inset-y-0 right-0 w-72 max-w-[85vw] bg-primary text-on-primary flex flex-col` with the `#x` close button, the same data-driven nav loop as the sidebar (identical active styling: `bg-white/15 text-on-primary border-l-2 border-secondary`), and the user/logout row. The desktop sidebar markup itself stays untouched — the drawer reuses the `$navItems`/`$activeHref` computed in the layout.
-3. **Bottom tab bar** — `md:hidden fixed bottom-0 inset-x-0 z-30 bg-primary text-on-primary flex justify-around border-t border-white/10 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]` (the `env()` keeps tabs clear of the iOS home indicator). Exactly **three** tabs: Dashboard, Expenses, Fund Top-Ups (filtered from `$navItems` by `href`). Active tab = `text-on-primary border-t-2 border-secondary`; inactive = `text-on-primary/80`.
+```html
+<div class="mt-auto p-3" x-data="{ open: false }">
+  <button type="button" x-on:click="open = !open"
+          class="w-full flex items-center gap-3 px-3 py-2.5 rounded hover:bg-white/5 transition-colors">
+    <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-on-primary text-sm font-semibold">
+      <!-- first initial of user's name -->
+      I
+    </div>
+    <div class="flex-1 text-left">
+      <p class="text-sm font-medium text-on-primary">Ifeoma</p>
+      <p class="text-xs text-on-primary/60">Accountant</p>
+    </div>
+  </button>
 
-Rules that go with it:
-- `main` mobile padding is `p-4` per design-system's 1rem reflow, plus `pb-24 md:pb-8` so the fixed bottom bar never covers the last table row.
-- Every screen's table container uses the §8 two-div pattern — outer `overflow-hidden` for the card look, inner `overflow-x-auto table-scroll` around the `<table>` — without it the table's min-content width forces the whole page wider than the viewport on phones, and a single `overflow-hidden` clips the columns unreachably.
-- Metric-card grids must be `grid-cols-1 sm:grid-cols-2 md:grid-cols-N`, never `grid-cols-2` at the phone breakpoint — a long naira value overflows a 2-up phone column.
+  <div x-show="open" x-cloak x-on:click.outside="open = false"
+       class="mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-[0_12px_24px_rgba(0,0,0,0.08)] overflow-hidden">
+    <a href="/account/password" class="block px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low">
+      Change Password
+    </a>
+    <a href="/logout" class="block px-4 py-2.5 text-sm text-error hover:bg-surface-container-low">
+      Logout
+    </a>
+  </div>
+</div>
+```
+
+Add this as the last child of the `<aside>` from §2, after the `<nav>` — use `flex flex-col` on the `<aside>` (already specified in §2) and `mt-auto` here to push it to the bottom regardless of how many nav items exist above it.
+
+## 2b. Change Password Form
+
+Standard Page Shell (§1), with a narrower nested form card since it only has three fields:
+
+```html
+<div class="max-w-md mx-auto">
+  <div class="bg-surface-container-lowest rounded-lg border border-outline-variant p-8">
+    <h2 class="text-xl font-semibold text-on-surface mb-6">Change Password</h2>
+
+    <form method="POST" action="/account/password">
+      <label class="block text-sm font-medium text-on-surface mb-1.5" for="current_password">Current Password</label>
+      <input type="password" id="current_password" name="current_password"
+             class="w-full px-3.5 py-2.5 rounded border border-outline text-sm mb-4">
+
+      <label class="block text-sm font-medium text-on-surface mb-1.5" for="new_password">New Password</label>
+      <input type="password" id="new_password" name="new_password"
+             class="w-full px-3.5 py-2.5 rounded border border-outline text-sm mb-1">
+      <p class="text-xs text-on-surface-variant mb-4">Minimum 8 characters.</p>
+
+      <label class="block text-sm font-medium text-on-surface mb-1.5" for="confirm_password">Confirm New Password</label>
+      <input type="password" id="confirm_password" name="confirm_password"
+             class="w-full px-3.5 py-2.5 rounded border border-outline text-sm mb-6">
+
+      <button type="submit"
+              class="w-full py-3 rounded bg-primary text-on-primary text-sm font-semibold hover:opacity-90 transition-opacity">
+        Update Password
+      </button>
+    </form>
+  </div>
+</div>
+```
+
+On success, use the `dottToast` pattern from §9b ("Password updated") rather than a full page reload — stay on the same screen with fields cleared, consistent with how other actions in the app confirm success.
 
 ---
 
@@ -188,6 +241,87 @@ Never a heavier shadow than this. Never a different radius than `rounded-lg` for
                px-4 py-2.5 rounded hover:opacity-90 transition-opacity">
   Reject
 </button>
+```
+
+### 4a. Loading State (required on every action button)
+
+Any button that triggers a save, submit, approve/reject, or other state-changing action must show a loading state and disable itself while the request is in flight — otherwise an impatient double-click can double-submit an expense, double-approve, or double-anything. **The button must always re-enable on failure too, not just success** — a network error that leaves a button permanently stuck in "Saving..." is worse than no loading state at all.
+
+**Reusable spinner** (used inside any button below):
+```html
+<svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+</svg>
+```
+
+**Pattern A — plain form submission** (page reloads/navigates on success, so `loading` never needs to be reset manually):
+```html
+<form x-data="{ loading: false }" x-on:submit="loading = true" method="POST" action="/expenses">
+  <!-- fields -->
+  <button type="submit" :disabled="loading"
+          class="w-full py-3 rounded bg-primary text-on-primary text-sm font-semibold
+                 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed
+                 flex items-center justify-center gap-2">
+    <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    <span x-text="loading ? 'Saving...' : 'Save Expense'"></span>
+  </button>
+</form>
+```
+
+**Pattern B — AJAX/fetch-driven actions** (approve/reject buttons, anything using JSON endpoints per Tech Spec §16) — `loading` MUST reset in a `finally` block so it resets on both success and failure:
+```html
+<div x-data="{
+  loading: false,
+  async approve() {
+    this.loading = true;
+    try {
+      const res = await fetch('/expenses/approve', { method: 'POST', body: JSON.stringify({ id: 42 }) });
+      if (!res.ok) throw new Error('Request failed');
+      dottToast.fire({ icon: 'success', title: 'Expense approved' });
+      // update UI / remove row / redirect as appropriate
+    } catch (e) {
+      dottToast.fire({ icon: 'error', title: 'Could not approve — try again' });
+    } finally {
+      this.loading = false;
+    }
+  }
+}">
+  <button type="button" x-on:click="approve()" :disabled="loading"
+          class="bg-primary text-on-primary text-sm font-semibold px-4 py-2.5 rounded
+                 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed
+                 flex items-center justify-center gap-2">
+    <svg x-show="loading" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    <span x-text="loading ? 'Approving...' : 'Approve'"></span>
+  </button>
+</div>
+```
+
+**Pattern C — SweetAlert2 confirmation dialogs** (reject-with-comment, close-with-reason, per §9b): don't hand-roll a loading state here — SweetAlert2 has this built in via `showLoaderOnConfirm` + an async `preConfirm`, which automatically disables the buttons and shows a spinner on the confirm button while `preConfirm` is running:
+```js
+const { value: comment } = await dottAlert.fire({
+  title: 'Reject this expense?',
+  input: 'textarea',
+  inputPlaceholder: 'Reason for rejection (required)',
+  inputValidator: (value) => !value && 'A reason is required',
+  showCancelButton: true,
+  confirmButtonText: 'Reject',
+  showLoaderOnConfirm: true,
+  preConfirm: async (comment) => {
+    const res = await fetch('/expenses/reject', { method: 'POST', body: JSON.stringify({ comment }) });
+    if (!res.ok) {
+      Swal.showValidationMessage('Could not reject — try again');
+      return false; // keeps the dialog open, re-enables the button
+    }
+    return comment;
+  },
+});
 ```
 
 ---
@@ -238,6 +372,37 @@ Usage: `<?= backfilled_badge($expense['is_historical']) ?>` next to (or instead 
 
 ---
 
+## 5b. Amount Formatting & Debit/Credit Color Coding
+
+Debit/expense amounts render in red (`error` token) wherever they appear as plain text — Dashboard's Debit card, expense list/table Amount columns, the Fund Ledger's outflow column, and any report total representing money leaving the float. Credit/top-up amounts render in green for visual symmetry (flag it if you'd rather these stayed neutral/black — only the red-for-debit half was explicitly requested). Never color-code inside a status badge (§5) — that's a separate, already-established color language for approval state, not for amount sign.
+
+One helper handles both the currency formatting (so ₦ symbol / decimals / thousand separators are consistent everywhere) and the color coding, so this never needs reimplementing per screen:
+
+```php
+if (!function_exists('format_amount')) {
+    function format_amount(float $amount, string $type = 'neutral'): string {
+        $colorClass = match ($type) {
+            'debit'  => 'text-error',
+            'credit' => 'text-emerald-600',
+            default  => 'text-on-surface',
+        };
+        $formatted = '₦' . number_format($amount, 2);
+        return "<span class=\"{$colorClass} font-medium\">{$formatted}</span>";
+    }
+}
+```
+
+Usage:
+```php
+<?= format_amount($expense['amount'], 'debit') ?>
+<?= format_amount($topup['amount'], 'credit') ?>
+<?= format_amount($currentBalance, 'neutral') ?>  <!-- balance figures stay neutral, they're not a flow direction -->
+```
+
+Applies to: Dashboard metric cards (the Credit/Debit values renamed earlier), Expense list/table Amount column, Fund Top-Up list Amount column, Fund Ledger's `amount_in`/`amount_out` columns (Tech Spec §14a), and any report row totaling expenditure vs. receipts. Balance figures (Current Balance, opening/closing balance in reports) always use `'neutral'` — a balance isn't a debit or a credit, it's a snapshot.
+
+---
+
 ## 6. Metric Card (Dashboard KPIs)
 
 ```html
@@ -285,40 +450,28 @@ Two-column layout for related fields (e.g. date + department side by side):
 
 ## 8. Table
 
-**Two-div wrapper — copy exactly, never put `overflow-hidden` directly on the same div that wraps the table.** Splitting the wrapper is what makes the table horizontally scrollable on narrow viewports:
-
-- The **OUTER div** (`bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden`) supplies the card look, the rounded corners, and the vertical clipping. `overflow-hidden` stays here ONLY — it must not sit on the scroll div, or it blocks scrolling in every direction.
-- The **INNER div** (`overflow-x-auto table-scroll`) wraps just the `<table>` and is what actually enables horizontal scroll. `table-scroll` drives the edge-fade affordance and horizontal overscroll containment (see §8c).
-- If a header row sits inside the card (e.g. the dashboard's "Recent activity" title), keep it OUTSIDE the inner scroll div so it stays put while the columns scroll beneath it.
-- **The `<table>` itself carries an explicit `min-w-…` class — this is what makes the scroll happen at all.** A `w-full` table in `table-layout: auto` will happily compress its columns to fit the wrapper, and if the columns compress there is no overflow and `overflow-x-auto` has nothing to scroll. The min-width stops the compression: the table renders at `max(container width, min-width)`, so whenever the container is narrower than the minimum the table overflows the inner div and that overflow becomes the scroll. On desktop the container is wider than the minimum, `width: 100%` wins, and the table still renders full-width with no scrollbar. Choose the value by column count — `min-w-[640px]` for a standard 4–6 column table, roughly +80px per additional column, wider for input grids (the 7-column Bulk Historical Entry Table in §8a uses `min-w-[900px]`). When in doubt, count the `<th>`s and size the minimum to the sum of their comfortable widths.
-- **Cells holding text that shouldn't wrap** (names, payees, dates, amounts, references, status labels) carry `whitespace-nowrap`. A cell whose text wraps keeps shrinking its column, which silently reduces the table's content width and fights the min-width above. `whitespace-nowrap` forces that column to hold its content width.
-
 ```html
 <div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
-  <div class="overflow-x-auto table-scroll">
-    <table class="w-full text-sm min-w-[640px]">
-      <thead class="bg-surface-container-low border-b border-outline-variant">
-        <tr>
-          <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Date</th>
-          <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Payee</th>
-          <th class="text-right px-4 py-3 font-medium text-on-surface-variant">Amount</th>
-          <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Status</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-outline-variant">
-        <tr class="hover:bg-surface-container-low transition-colors">
-          <td class="px-4 py-3 text-on-surface whitespace-nowrap">10/06/2026</td>
-          <td class="px-4 py-3 text-on-surface whitespace-nowrap">Chika</td>
-          <td class="px-4 py-3 text-on-surface text-right whitespace-nowrap">₦23,700</td>
-          <td class="px-4 py-3"><!-- status_badge() here --></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <table class="w-full text-sm">
+    <thead class="bg-surface-container-low border-b border-outline-variant">
+      <tr>
+        <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Date</th>
+        <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Payee</th>
+        <th class="text-right px-4 py-3 font-medium text-on-surface-variant">Amount</th>
+        <th class="text-left px-4 py-3 font-medium text-on-surface-variant">Status</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant">
+      <tr class="hover:bg-surface-container-low transition-colors">
+        <td class="px-4 py-3 text-on-surface">10/06/2026</td>
+        <td class="px-4 py-3 text-on-surface">Chika</td>
+        <td class="px-4 py-3 text-on-surface text-right">₦23,700</td>
+        <td class="px-4 py-3"><!-- status_badge() here --></td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 ```
-
-Never a raw `overflow-hidden` on a div that directly contains a `<table>` — that clips columns with no way to reach them.
 
 ---
 
@@ -328,52 +481,50 @@ The full working Alpine.js data structure — this was previously left as a desc
 
 ```html
 <div x-data="historicalEntryForm()" class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
-  <div class="overflow-x-auto table-scroll">
-    <table class="w-full text-sm min-w-[900px]">
-      <thead class="bg-surface-container-low border-b border-outline-variant">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-container-low border-b border-outline-variant">
+      <tr>
+        <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Date</th>
+        <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Doc No.</th>
+        <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Payee</th>
+        <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Description</th>
+        <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Department</th>
+        <th class="text-right px-3 py-3 font-medium text-on-surface-variant">Amount</th>
+        <th class="px-3 py-3 w-10"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant" x-ref="tableBody">
+      <template x-for="(row, index) in rows" :key="row.id">
         <tr>
-          <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Date</th>
-          <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Doc No.</th>
-          <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Payee</th>
-          <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Description</th>
-          <th class="text-left px-3 py-3 font-medium text-on-surface-variant">Department</th>
-          <th class="text-right px-3 py-3 font-medium text-on-surface-variant">Amount</th>
-          <th class="px-3 py-3 w-10"></th>
+          <td class="px-2 py-2"><input type="date" x-model="row.date"
+              class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
+          <td class="px-2 py-2"><input type="text" x-model="row.document_no"
+              class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
+          <td class="px-2 py-2"><input type="text" x-model="row.payee"
+              class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
+          <td class="px-2 py-2"><input type="text" x-model="row.description"
+              class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
+          <td class="px-2 py-2">
+            <select x-model="row.department_id" class="w-full px-2 py-1.5 rounded border border-outline text-sm">
+              <option value="">Select...</option>
+              <!-- department options rendered server-side, injected once via PHP foreach -->
+            </select>
+          </td>
+          <td class="px-2 py-2">
+            <input type="number" x-model="row.amount"
+                   x-on:keydown.enter.prevent="addRow(index)"
+                   class="w-full px-2 py-1.5 rounded border border-outline text-sm text-right">
+          </td>
+          <td class="px-2 py-2 text-center">
+            <button type="button" x-on:click="removeRow(index)"
+                    x-show="rows.length > 1" class="text-outline hover:text-error">
+              <svg class="w-4 h-4" stroke="currentColor" fill="none"><use href="/assets/icons/sprite.svg#trash-2"></use></svg>
+            </button>
+          </td>
         </tr>
-      </thead>
-      <tbody class="divide-y divide-outline-variant" x-ref="tableBody">
-        <template x-for="(row, index) in rows" :key="row.id">
-          <tr>
-            <td class="px-2 py-2"><input type="date" x-model="row.date"
-                class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
-            <td class="px-2 py-2"><input type="text" x-model="row.document_no"
-                class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
-            <td class="px-2 py-2"><input type="text" x-model="row.payee"
-                class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
-            <td class="px-2 py-2"><input type="text" x-model="row.description"
-                class="w-full px-2 py-1.5 rounded border border-outline text-sm"></td>
-            <td class="px-2 py-2">
-              <select x-model="row.department_id" class="w-full px-2 py-1.5 rounded border border-outline text-sm">
-                <option value="">Select...</option>
-                <!-- department options rendered server-side, injected once via PHP foreach -->
-              </select>
-            </td>
-            <td class="px-2 py-2">
-              <input type="number" x-model="row.amount"
-                     x-on:keydown.enter.prevent="addRow(index)"
-                     class="w-full px-2 py-1.5 rounded border border-outline text-sm text-right">
-            </td>
-            <td class="px-2 py-2 text-center">
-              <button type="button" x-on:click="removeRow(index)"
-                      x-show="rows.length > 1" class="text-outline hover:text-error">
-                <svg class="w-4 h-4" stroke="currentColor" fill="none"><use href="/assets/icons/sprite.svg#trash-2"></use></svg>
-              </button>
-            </td>
-          </tr>
-        </template>
-      </tbody>
-    </table>
-  </div>
+      </template>
+    </tbody>
+  </table>
 
   <div class="p-4 border-t border-outline-variant flex justify-between">
     <button type="button" x-on:click="addRow()"
@@ -414,18 +565,6 @@ function historicalEntryForm() {
 **The two bugs this fixes, both worth checking in whatever's currently built:**
 - Every button has an explicit `type="button"` — without it, a button inside a `<form>` defaults to `type="submit"` and reloads the page instead of running the click handler. This is almost certainly what broke Add Row.
 - `x-data="historicalEntryForm()"` wraps the *entire* table AND both buttons in one scope — if Add Row currently sits outside whatever element has `x-data`, Alpine has no idea what `addRow()` is and the click silently does nothing.
-
----
-
-## 8c. Scrollable-Table Edge Fade (the "swipe to see more" affordance)
-
-A table that's just clipped looks identical to one that's merely narrow — so without a hint, users on phones never discover the horizontal scroll at all. Every `table-scroll` container therefore gets a soft gradient fade on the trailing edge whenever there is more content to scroll to.
-
-This is implemented ONCE in shared code, not per-screen markup:
-- **CSS** in `build/tailwind/app.source.css`: `.table-scroll` sets `overscroll-behavior-x: contain` (horizontal swipes on the table never fight the page's vertical scroll) and `-webkit-overflow-scrolling: touch`; `.table-scroll.has-more-right` / `.has-more-left` apply a `mask-image` linear gradient that fades the edge.
-- **JS** in `public_html/assets/js/app.js`: `initTableScrollFades()` measures every `.table-scroll` element and toggles `has-more-right` while `scrollLeft` hasn't reached the end, and `has-more-left` once the user has scrolled away from the start. It re-measures on scroll, resize, and (via a `MutationObserver`) whenever Alpine re-renders an `x-show`/`x-for` table.
-
-Desktop is unaffected: at widths where the table fits its container there is no overflow, `has-more-right` stays off, and the table renders fully visible with no fade and no scrollbar — `overflow-x-auto` only does anything when content is actually wider than its container.
 
 ---
 
@@ -569,7 +708,7 @@ Per the design system's writing guidance — an empty state is an invitation to 
 | Invoices | `file-text` |
 | Expenses | `receipt` |
 | Petty Cash | `wallet` |
-| Fund Top-Ups | `arrow-up-circle` |
+| Fund Account (top-up request) | `arrow-up-circle` |
 | Payments | `banknote` |
 | Payroll | `users` |
 | Reports | `bar-chart-3` |
@@ -675,51 +814,10 @@ Add `bell` to the icon sprite (§9a) if it isn't already there.
 
 ---
 
-## 9d. PWA Install Banner (Tech Spec §17)
-
-Shown only when the browser fires `beforeinstallprompt` (Chrome desktop + Chrome Android) and the user hasn't dismissed it in the last 14 days. Dismissible, never a blocking modal. The standard pattern: the handler `preventDefault()`s the event and stashes it, and `prompt()` is only called from the Install button's click (a real user gesture). Rendered once in the app layout via `install_banner()` — same trigger-markup approach as §9c, real logic in `installBannerState()` in `app.js`.
-
-```html
-<div x-data="installBannerState()" x-show="visible" x-cloak
-     class="bg-secondary-container/15 border border-secondary-container rounded-lg p-4 mb-6 flex items-center justify-between">
-  <div class="flex items-center gap-3">
-    <svg class="w-5 h-5 text-secondary" stroke="currentColor" fill="none"><use href="/assets/icons/sprite.svg#download"></use></svg>
-    <p class="text-sm text-on-surface">Install DOTT TV Finance for a faster, offline-capable experience.</p>
-  </div>
-  <div class="flex items-center gap-2">
-    <button type="button" x-on:click="install()"
-            class="bg-primary text-on-primary text-sm font-semibold px-4 py-2 rounded hover:opacity-90 transition-opacity">
-      Install
-    </button>
-    <button type="button" x-on:click="dismiss()"
-            class="text-sm text-on-surface-variant px-3 py-2 hover:text-on-surface">
-      Not now
-    </button>
-  </div>
-</div>
-```
-
-`installBannerState()` handles the capture/dismiss/re-offer bookkeeping; `appinstalled` hides the banner for good. iOS Safari never fires `beforeinstallprompt` — the §9c banner already swaps to an "install to home screen" nudge there for push, which covers iOS installability.
-
-## 9e. "Last Synced" Indicator (Tech Spec §17)
-
-Report pages are the one offline-cacheable *data* surface (viewing a stale report offline is safe; submitting a stale write isn't), so every report screen shows how current its numbers are. Pure client-side via `syncIndicator()` in `app.js` — it records the last successful page load in `localStorage` and re-renders on `online`/`offline` events. Green dot + "Synced &lt;time&gt;" when online, error-colored dot + "Last synced &lt;time&gt;" when serving a cached copy offline.
-
-```html
-<div x-data="syncIndicator()"
-     class="inline-flex items-center gap-1.5 text-label-sm text-on-surface-variant">
-  <span class="inline-block w-1.5 h-1.5 rounded-full" :class="offline ? 'bg-error' : 'bg-success'"></span>
-  <span x-text="label"></span>
-</div>
-```
-
-Emit it on every report screen with `<?= sync_indicator() ?>` directly under the `date_range_filter()` partial.
-
----
-
 ## 10. Non-negotiable rules for every screen
 
 - Never a raw hex value or arbitrary Tailwind color (`text-[#123456]`, `bg-blue-500`) — only the named tokens from `design-system-dotttv.md`'s `@theme` block.
 - Never a spacing value outside the 8px rhythm (`p-3`, `p-4`, `p-6`, `p-8` — not `p-5`, `p-7`).
 - Every new screen starts from the Page Shell (§1) — no exceptions, even a "quick" admin screen.
+- Every action button (save, submit, approve, reject, delete) uses a loading state per §4a — no exceptions, and it must re-enable on failure, not just success.
 - If a screen needs a pattern not covered above, build it once, add it to this document, then use it everywhere it recurs — never invent a one-off variant.

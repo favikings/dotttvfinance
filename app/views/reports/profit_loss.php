@@ -27,7 +27,7 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <?= metric_card('Net Revenue', naira($data['net_revenue']), $data['invoice_count'] . ' approved invoice(s)') ?>
-            <?= metric_card('Total Expenses', naira($data['total_expenses']), $data['expense_count'] . ' expense(s)') ?>
+            <?= metric_card('Total Expenses', format_amount($data['total_expenses'], 'debit'), $data['expense_count'] . ' expense(s)') ?>
             <?= metric_card('Net Profit', naira($data['net_profit'])) ?>
         </div>
 
@@ -45,7 +45,7 @@
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-on-surface-variant pl-8">Less: WHT Withheld at Source</td>
-                        <td class="px-4 py-3 text-error text-right">&minus; <?= naira($data['wht_withheld']) ?></td>
+                        <td class="px-4 py-3 text-right">&minus; <?= format_amount($data['wht_withheld'], 'debit') ?></td>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-on-surface-variant pl-8">VAT Collected <span class="text-label-sm">(pass-through, excluded from revenue)</span></td>
@@ -60,7 +60,7 @@
                             Expenses
                             <?php if ($data['has_historical_expenses']): ?> <?= backfilled_badge(true) ?><?php endif; ?>
                         </td>
-                        <td class="px-4 py-3 text-error text-right font-medium">&minus; <?= naira($data['total_expenses']) ?></td>
+                        <td class="px-4 py-3 text-right">&minus; <?= format_amount($data['total_expenses'], 'debit') ?></td>
                     </tr>
                     <tr class="bg-surface-container-low">
                         <td class="px-4 py-3 text-on-surface font-semibold">Net Profit</td>

@@ -67,10 +67,14 @@ $todayTs = strtotime($today);
                                                 x-on:click="approve(item)"
                                                 :disabled="busy"
                                                 :class="busy ? 'opacity-60 cursor-not-allowed' : ''">
-                                            <svg class="w-4 h-4" stroke="currentColor" fill="none">
+                                            <svg x-show="busy && actingId === item.id" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                            </svg>
+                                            <svg x-show="!(busy && actingId === item.id)" class="w-4 h-4" stroke="currentColor" fill="none">
                                                 <use href="<?= View::e(url('/assets/icons/sprite.svg')) ?>#check"></use>
                                             </svg>
-                                            Approve
+                                            <span x-text="busy && actingId === item.id ? 'Approving...' : 'Approve'"></span>
                                         </button>
                                         <button type="button"
                                                 class="inline-flex items-center gap-1.5 bg-error text-on-error font-medium text-sm px-3 py-2 rounded hover:opacity-90 transition-opacity"
@@ -222,6 +226,7 @@ $todayTs = strtotime($today);
         return {
             items: window.INVOICE_QUEUE_ITEMS || [],
             busy: false,
+            actingId: null,
 
             approve(item) {
                 const self = this;
@@ -231,14 +236,18 @@ $todayTs = strtotime($today);
                     'Approve'
                 ).then((result) => {
                     if (result.isConfirmed) {
+                        self.actingId = item.id;
                         self.postAction('/invoices/approve', { invoice_id: item.id }, (json) => {
                             self.removeItem(item.id);
                             dottToast.fire({ icon: 'success', title: json.message });
-                        });
+                        }).finally(() => { self.actingId = null; });
                     }
                 });
             },
 
+            // UI Component Guide §4a Pattern C — the fetch runs inside
+            // preConfirm so SweetAlert2's showLoaderOnConfirm handles the
+            // dialog's own loading state; no separate loading flag needed.
             reject(item) {
                 const self = this;
                 dottAlert.fire({
@@ -250,6 +259,32 @@ $todayTs = strtotime($today);
                     showCancelButton: true,
                     confirmButtonText: 'Reject',
                     cancelButtonText: 'Cancel',
+                    showLoaderOnConfirm: true,
+                    preConfirm: async (reason) => {
+                        try {
+                            const res = await fetch(window.APP_BASE_PATH + '/invoices/reject', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({ _csrf: window.INVOICE_CSRF_TOKEN, invoice_id: item.id, reason: reason.trim() }),
+                            });
+                            const json = await res.json().catch(() => null);
+                            if (!json || !json.ok) {
+                                Swal.showValidationMessage((json && json.message) || 'Something went wrong. Please try again.');
+                                return false;
+                            }
+                            return json;
+                        } catch (err) {
+                            Swal.showValidationMessage(
+                                navigator.onLine
+                                    ? 'Could not reach the server. Check your connection and try again.'
+                                    : "You're offline — reconnect to reject invoices."
+                            );
+                            return false;
+                        }
+                    },
                     background: 'var(--color-surface-container-lowest)',
                     color: 'var(--color-on-surface)',
                     confirmButtonColor: 'var(--color-error)',
@@ -260,10 +295,8 @@ $todayTs = strtotime($today);
                     },
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        self.postAction('/invoices/reject', { invoice_id: item.id, reason: result.value.trim() }, (json) => {
-                            self.removeItem(item.id);
-                            dottToast.fire({ icon: 'success', title: json.message });
-                        });
+                        self.removeItem(item.id);
+                        dottToast.fire({ icon: 'success', title: result.value.message });
                     }
                 });
             },

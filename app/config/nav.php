@@ -12,7 +12,7 @@ return [
     ['label' => 'Expenses', 'icon' => 'receipt', 'href' => '/expenses', 'permission' => 'expenses.view'],
     ['label' => 'Approval Queue', 'icon' => 'list-checks', 'href' => '/approvals', 'permission' => 'expenses.approve'],
     ['label' => 'Historical Entry', 'icon' => 'history', 'href' => '/historical-entry/expenses', 'permission' => 'expenses.create'],
-    ['label' => 'Fund Top-Ups', 'icon' => 'arrow-up-circle', 'href' => '/fund-topups', 'permission' => 'fund_topups.view'],
+    ['label' => 'Fund Account', 'icon' => 'arrow-up-circle', 'href' => '/fund-topups', 'permission' => 'fund_topups.view'],
     ['label' => 'Payments', 'icon' => 'banknote', 'href' => '/payments', 'permission' => 'payments.view'],
     ['label' => 'Invoices', 'icon' => 'file-text', 'href' => '/invoices', 'permission' => 'invoices.view'],
     ['label' => 'Payroll', 'icon' => 'users', 'href' => '/payroll', 'permission' => 'payroll.view'],

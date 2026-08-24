@@ -45,6 +45,20 @@ class User
         return $stmt->fetchAll();
     }
 
+    public static function passwordHash(int $id): ?string
+    {
+        $stmt = Database::connection()->prepare('SELECT password_hash FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$id]);
+        $hash = $stmt->fetchColumn();
+        return $hash === false ? null : $hash;
+    }
+
+    public static function updatePassword(int $id, string $hash): void
+    {
+        $stmt = Database::connection()->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+        $stmt->execute([$hash, $id]);
+    }
+
     public static function emailExists(string $email, ?int $excludeId = null): bool
     {
         $sql = 'SELECT COUNT(*) FROM users WHERE email = ?';

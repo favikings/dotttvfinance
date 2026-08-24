@@ -9,7 +9,7 @@
 <div class="space-y-6" x-data="fundTopupQueue()">
     <div class="flex items-start justify-between gap-4">
         <div>
-            <h1 class="text-headline-md">Fund Top-Ups</h1>
+            <h1 class="text-headline-md">Fund Account</h1>
             <p class="text-body-md text-on-surface-variant mt-1">Requests to top up the operating float. Either GM or Chairman can clear a pending request.</p>
         </div>
         <?php if ($canCreate): ?>
@@ -54,7 +54,11 @@
                                                 x-on:click="approve(item)"
                                                 :disabled="busy"
                                                 :class="busy ? 'opacity-60 cursor-not-allowed' : ''">
-                                            Approve
+                                            <svg x-show="busy && actingId === item.id" x-cloak class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                            </svg>
+                                            <span x-text="busy && actingId === item.id ? 'Approving...' : 'Approve'"></span>
                                         </button>
                                         <button type="button"
                                                 class="inline-flex items-center gap-1.5 bg-error text-on-error font-medium text-sm px-3 py-2 rounded hover:opacity-90 transition-opacity"
@@ -105,7 +109,7 @@
                         <?php foreach ($topups as $topup): ?>
                             <tr class="hover:bg-surface-container-low transition-colors">
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($topup['date']))) ?></td>
-                                <td class="px-4 py-3 text-on-surface text-right whitespace-nowrap"><?= naira($topup['amount']) ?></td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($topup['amount'], 'credit') ?></td>
                                 <td class="px-4 py-3 text-on-surface-variant whitespace-nowrap"><?= View::e($topup['reference'] ?? '—') ?></td>
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e($topup['requested_by_name'] ?? '—') ?></td>
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap">
@@ -138,6 +142,7 @@
         return {
             items: window.TOPUP_QUEUE_ITEMS || [],
             busy: false,
+            actingId: null,
 
             approve(item) {
                 const self = this;
@@ -147,14 +152,18 @@
                     'Approve'
                 ).then((result) => {
                     if (result.isConfirmed) {
+                        self.actingId = item.id;
                         self.postAction('/fund-topups/approve', { topup_id: item.id }, (json) => {
                             self.removeItem(item.id);
                             dottToast.fire({ icon: 'success', title: json.message });
-                        });
+                        }).finally(() => { self.actingId = null; });
                     }
                 });
             },
 
+            // UI Component Guide §4a Pattern C — the fetch runs inside
+            // preConfirm so SweetAlert2's showLoaderOnConfirm handles the
+            // dialog's own loading state; no separate loading flag needed.
             reject(item) {
                 const self = this;
                 dottAlert.fire({
@@ -166,6 +175,32 @@
                     showCancelButton: true,
                     confirmButtonText: 'Reject',
                     cancelButtonText: 'Cancel',
+                    showLoaderOnConfirm: true,
+                    preConfirm: async (comment) => {
+                        try {
+                            const res = await fetch(window.APP_BASE_PATH + '/fund-topups/reject', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({ _csrf: window.TOPUP_CSRF_TOKEN, topup_id: item.id, comment: comment.trim() }),
+                            });
+                            const json = await res.json().catch(() => null);
+                            if (!json || !json.ok) {
+                                Swal.showValidationMessage((json && json.message) || 'Something went wrong. Please try again.');
+                                return false;
+                            }
+                            return json;
+                        } catch (err) {
+                            Swal.showValidationMessage(
+                                navigator.onLine
+                                    ? 'Could not reach the server. Check your connection and try again.'
+                                    : "You're offline — reconnect to reject top-ups."
+                            );
+                            return false;
+                        }
+                    },
                     background: 'var(--color-surface-container-lowest)',
                     color: 'var(--color-on-surface)',
                     confirmButtonColor: 'var(--color-error)',
@@ -176,10 +211,8 @@
                     },
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        self.postAction('/fund-topups/reject', { topup_id: item.id, comment: result.value.trim() }, (json) => {
-                            self.removeItem(item.id);
-                            dottToast.fire({ icon: 'success', title: json.message });
-                        });
+                        self.removeItem(item.id);
+                        dottToast.fire({ icon: 'success', title: result.value.message });
                     }
                 });
             },

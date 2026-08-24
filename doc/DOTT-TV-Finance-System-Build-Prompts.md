@@ -295,6 +295,38 @@ Phase 2/3 additions per the Build Order, don't build ahead of schedule here.
 - [ ] Recent activity feed correctly interleaves expenses and top-ups by date
 - [ ] Metric card component is genuinely reusable (no hardcoded values, takes props)
 
+### Prompt 1.7 — Self-service password change (added post-build, per direct feedback)
+
+```
+Read Tech Spec §5a and UI Component Guide §2a/§2b before starting.
+
+Build the Account Menu (sidebar footer dropdown showing the logged-in user's
+name/role, Change Password + Logout links) and the Change Password screen.
+
+This is NOT gated by Permission::require() — it's not a module.action check,
+it's "does this session belong to the account being modified." All 4 roles
+get access, including Super Admin.
+
+Validation order: current password must password_verify() correctly first
+(this is the actual security control — reject before checking anything else
+if this fails, generic error message, don't reveal whether it failed here vs.
+elsewhere), then new password minimum 8 characters, then new password must
+match the confirmation field.
+
+On success: session_regenerate_id(true), write an audit_log entry
+(action='password_changed', entity_type='users', entity_id=<own id>,
+before_json/after_json NULL or timestamp-only) — the actual password must
+NEVER appear in the audit log in any form, hashed or plain. Show a success
+toast (dottToast from §9b) rather than reloading the page. Current session
+stays valid — no forced re-login.
+```
+
+**Acceptance criteria:**
+- [ ] All 4 roles can access and successfully use this, not just Accountant
+- [ ] Wrong current password is rejected with a generic error before any other validation runs
+- [ ] A successful change produces an audit_log row with no password value anywhere in before/after JSON
+- [ ] User remains logged in after a successful change (no forced logout)
+
 ---
 
 ## Phase 2 — Approval Workflow & Payments
@@ -746,6 +778,65 @@ all instances found, not just $companyName.
 **Acceptance criteria:**
 - [ ] No PHP warnings when generating any PDF report
 - [ ] Company name renders correctly on the PDF header
+
+### Prompt R.6 — Debit/credit amount color coding
+
+```
+Read UI Component Guide §5b (Amount Formatting & Debit/Credit Color Coding) —
+new addition.
+
+Add the format_amount() helper. Replace existing amount rendering (wherever
+₦ amounts are currently formatted inline per-screen) with calls to this
+helper across: Dashboard's Credit/Debit metric cards, the Expense list/table
+Amount column ('debit'), the Fund Top-Up list Amount column ('credit'), and
+the Fund Ledger's amount_in/amount_out columns ('credit'/'debit' respectively).
+
+Balance figures (Current Balance card, opening/closing balance anywhere in
+Reports) use 'neutral' — do NOT color these, a balance isn't a debit or credit.
+
+Grep for any other place a raw ₦ amount is formatted inline instead of via
+this helper, and consolidate those too — report which screens you changed.
+```
+
+**Acceptance criteria:**
+- [ ] Every expense amount and the Debit card render in red; every top-up amount and the Credit card render in green
+- [ ] Balance figures remain neutral/black everywhere, not colored
+- [ ] Currency formatting (₦ symbol, decimals, thousand separators) is now visibly consistent across every screen that shows an amount, not just the ones explicitly listed above
+
+### Prompt R.7 — Loading states on every action button
+
+```
+Read UI Component Guide §4a (Loading State) — new addition, three patterns
+given: plain form submission, AJAX/fetch-driven actions, and SweetAlert2
+confirmation dialogs.
+
+Go through every action button built so far and add the appropriate loading
+pattern:
+- Login (Sign In), Change Password (Update Password) — Pattern A
+- Expense entry (Save Expense), Fund Top-Up request, Payment voucher creation,
+  Settings module saves (departments, categories, approval rules, users) —
+  Pattern A if a plain form POST, Pattern B if already AJAX-driven
+- Bulk Historical Entry's "Save All" button — Pattern B (it's already an async
+  call per Prompt 1.5/UI Guide §8a's saveAll() method — add the loading state
+  to that existing method rather than rewriting it)
+- Approve/Reject buttons in the GM/Chairman queues (Prompt 2.1) — Pattern B
+- Any SweetAlert2-based confirmation (reject-with-comment, close-with-reason,
+  delete confirmations) — Pattern C, using showLoaderOnConfirm + preConfirm,
+  don't hand-roll a separate loading state for these
+
+For every Pattern B implementation, confirm the loading state resets in a
+finally block so a failed request doesn't leave the button permanently
+disabled — test this specifically by simulating a failed request (e.g.
+temporarily point a fetch at a wrong URL) and confirming the button recovers.
+
+Report which buttons you found and updated, grouped by which pattern each used.
+```
+
+**Acceptance criteria:**
+- [ ] Every action button shows a spinner and disables itself while its request is in flight
+- [ ] Rapidly double-clicking any Save/Approve/Reject button only triggers the action once, not twice
+- [ ] Simulating a failed request on at least 2 different Pattern B buttons confirms both re-enable afterward, not stuck in a permanent loading state
+- [ ] SweetAlert2 confirmations use the built-in showLoaderOnConfirm rather than a custom-built loading state
 
 
 ### Prompt 4.1 — Security & coverage audit

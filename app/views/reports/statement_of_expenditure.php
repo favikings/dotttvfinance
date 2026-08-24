@@ -31,8 +31,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <?= metric_card('Opening Balance', naira($data['opening_balance'])) ?>
             <?= metric_card('Closing Balance', naira($data['closing_balance'])) ?>
-            <?= metric_card('Funds Received', naira($data['funds_received']), $data['funds_received_count'] . ' top-up(s)') ?>
-            <?= metric_card('Approved Expenditure', naira($data['expenditure']), $data['expenditure_count'] . ' expense(s)') ?>
+            <?= metric_card('Funds Received', format_amount($data['funds_received'], 'credit'), $data['funds_received_count'] . ' top-up(s)') ?>
+            <?= metric_card('Approved Expenditure', format_amount($data['expenditure'], 'debit'), $data['expenditure_count'] . ' expense(s)') ?>
         </div>
 
         <div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
@@ -48,14 +48,14 @@
                             Add: Funds Received in Period
                             <?php if ($data['has_historical_funds']): ?> <?= backfilled_badge(true) ?><?php endif; ?>
                         </td>
-                        <td class="px-4 py-3 text-success text-right font-medium">+ <?= naira($data['funds_received']) ?></td>
+                        <td class="px-4 py-3 text-right">+ <?= format_amount($data['funds_received'], 'credit') ?></td>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-on-surface">
                             Less: Approved Expenditure in Period
                             <?php if ($data['has_historical_expenditure']): ?> <?= backfilled_badge(true) ?><?php endif; ?>
                         </td>
-                        <td class="px-4 py-3 text-error text-right font-medium">&minus; <?= naira($data['expenditure']) ?></td>
+                        <td class="px-4 py-3 text-right">&minus; <?= format_amount($data['expenditure'], 'debit') ?></td>
                     </tr>
                     <tr class="bg-surface-container-low">
                         <td class="px-4 py-3 text-on-surface font-semibold">Closing Balance</td>

@@ -32,10 +32,10 @@ $closing = !empty($data['rows'])
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <?= metric_card('Total In', naira($data['total_in'])) ?>
-            <?= metric_card('Total Out', naira($data['total_out'])) ?>
-            <?= metric_card('Net Movement', naira($data['total_in'] - $data['total_out'])) ?>
-            <?= metric_card('Closing Balance', naira($closing)) ?>
+            <?= metric_card('Total In', format_amount($data['total_in'], 'credit')) ?>
+            <?= metric_card('Total Out', format_amount($data['total_out'], 'debit')) ?>
+            <?= metric_card('Net Movement', format_amount($data['total_in'] - $data['total_out'], 'neutral')) ?>
+            <?= metric_card('Closing Balance', format_amount($closing, 'neutral')) ?>
         </div>
 
         <div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
@@ -75,9 +75,9 @@ $closing = !empty($data['rows'])
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e($row['payee'] ?? '—') ?></td>
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e($row['description'] ?? '—') ?></td>
                                 <td class="px-4 py-3 text-on-surface-variant whitespace-nowrap"><?= View::e($row['department_name'] ?? '—') ?></td>
-                                <td class="px-4 py-3 text-success text-right whitespace-nowrap"><?= $row['amount_in'] > 0 ? naira($row['amount_in']) : '—' ?></td>
-                                <td class="px-4 py-3 text-error text-right whitespace-nowrap"><?= $row['amount_out'] > 0 ? naira($row['amount_out']) : '—' ?></td>
-                                <td class="px-4 py-3 text-on-surface text-right whitespace-nowrap font-medium"><?= naira($row['running_balance']) ?></td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap"><?= $row['amount_in'] > 0 ? format_amount($row['amount_in'], 'credit') : '—' ?></td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap"><?= $row['amount_out'] > 0 ? format_amount($row['amount_out'], 'debit') : '—' ?></td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($row['running_balance'], 'neutral') ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -85,9 +85,9 @@ $closing = !empty($data['rows'])
                 <tfoot class="bg-surface-container-low border-t border-outline-variant">
                     <tr>
                         <td class="px-4 py-3 text-on-surface font-semibold" colspan="6">Total</td>
-                        <td class="px-4 py-3 text-on-surface text-right font-semibold whitespace-nowrap"><?= naira($data['total_in']) ?></td>
-                        <td class="px-4 py-3 text-on-surface text-right font-semibold whitespace-nowrap"><?= naira($data['total_out']) ?></td>
-                        <td class="px-4 py-3 text-on-surface text-right font-semibold whitespace-nowrap"><?= naira($closing) ?></td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($data['total_in'], 'credit') ?></td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($data['total_out'], 'debit') ?></td>
+                        <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($closing, 'neutral') ?></td>
                     </tr>
                 </tfoot>
             </table>

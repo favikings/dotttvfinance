@@ -48,7 +48,7 @@
         <p class="text-body-md text-on-surface-variant">
             DOTT TV runs a single revolving float in v1. The balance above is computed live from approved
             top-ups minus approved or historical expenses — never a manually stored number. To add money to
-            the float, use <span class="font-medium text-on-surface">Fund Top-Ups</span>; the fund account
+            the float, use <span class="font-medium text-on-surface">Fund Account</span>; the fund account
             itself is not editable here.
         </p>
     </div>

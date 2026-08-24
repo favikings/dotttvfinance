@@ -27,8 +27,8 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <?= metric_card('Cash In', naira($data['cash_in']), $data['cash_in_count'] . ' top-up(s)') ?>
-            <?= metric_card('Cash Out', naira($data['cash_out']), ($data['cash_out_paid_count'] + $data['cash_out_historical_count']) . ' disbursement(s)') ?>
+            <?= metric_card('Cash In', format_amount($data['cash_in'], 'credit'), $data['cash_in_count'] . ' top-up(s)') ?>
+            <?= metric_card('Cash Out', format_amount($data['cash_out'], 'debit'), ($data['cash_out_paid_count'] + $data['cash_out_historical_count']) . ' disbursement(s)') ?>
             <?= metric_card('Net Cash Flow', naira($data['net_cash_flow'])) ?>
         </div>
 
@@ -41,14 +41,14 @@
                             Cash In &mdash; Fund Top-Ups Received
                             <?php if ($data['has_historical_in']): ?> <?= backfilled_badge(true) ?><?php endif; ?>
                         </td>
-                        <td class="px-4 py-3 text-success text-right font-medium">+ <?= naira($data['cash_in']) ?></td>
+                        <td class="px-4 py-3 text-right">+ <?= format_amount($data['cash_in'], 'credit') ?></td>
                     </tr>
                     <tr>
                         <td class="px-4 py-3 text-on-surface">
                             Cash Out &mdash; Payments Disbursed
                             <?php if ($data['has_historical_out']): ?> <?= backfilled_badge(true) ?><?php endif; ?>
                         </td>
-                        <td class="px-4 py-3 text-error text-right font-medium">&minus; <?= naira($data['cash_out']) ?></td>
+                        <td class="px-4 py-3 text-right">&minus; <?= format_amount($data['cash_out'], 'debit') ?></td>
                     </tr>
                     <tr class="bg-surface-container-low">
                         <td class="px-4 py-3 text-on-surface font-semibold">Net Cash Flow</td>
