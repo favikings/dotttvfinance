@@ -6,15 +6,15 @@
  *            document_no: ?string, payee: ?string, department_id: ?int,
  *            department_name: ?string, description: ?string, amount_in: float,
  *            amount_out: float, is_historical: int, running_balance: float}>,
- *            total_in: float, total_out: float, has_historical: bool} $data
+ *            opening_balance: float, opening_as_of: string, total_in: float,
+ *            total_out: float, has_historical: bool} $data
  */
 $badge = static fn (bool $flag): string => $flag ? '<span class="badge-backfilled">Backfilled</span>' : '';
-$closing = !empty($data['rows'])
-    ? $data['rows'][count($data['rows']) - 1]['running_balance']
-    : 0.0;
+$closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
 ?>
 <table class="metrics">
     <tr>
+        <td><div class="metric-label">Opening Balance</div><div class="metric-value"><?= naira_pdf($data['opening_balance']) ?></div></td>
         <td><div class="metric-label">Total In</div><div class="metric-value"><?= naira_pdf($data['total_in']) ?></div></td>
         <td><div class="metric-label">Total Out</div><div class="metric-value"><?= naira_pdf($data['total_out']) ?></div></td>
         <td><div class="metric-label">Closing Balance</div><div class="metric-value"><?= naira_pdf($closing) ?></div></td>
@@ -38,6 +38,13 @@ $closing = !empty($data['rows'])
         <?php if (empty($data['rows'])): ?>
             <tr><td colspan="8">No fund activity in this date range.</td></tr>
         <?php else: ?>
+            <tr>
+                <td><?= View::e(date('d/m/Y', strtotime($from . ' -1 day'))) ?></td>
+                <td colspan="4" class="text-muted">Opening Balance brought forward</td>
+                <td class="text-right">&mdash;</td>
+                <td class="text-right">&mdash;</td>
+                <td class="text-right"><?= naira_pdf($data['opening_balance']) ?></td>
+            </tr>
             <?php foreach ($data['rows'] as $row): ?>
                 <tr>
                     <td><?= View::e(date('d/m/Y', strtotime($row['date']))) ?></td>
@@ -61,5 +68,5 @@ $closing = !empty($data['rows'])
 </table>
 
 <p class="text-muted" style="font-size: 8px; margin-top: 8px;">
-    Running balance computed by SQL window function over this date range (Tech Spec &sect;14a); figures include backfilled entries where marked.
+    Running balance begins from the opening balance (balance as of the day before the range start, Tech Spec &sect;10) carried into each row by a SQL window function over this date range (Tech Spec &sect;14a); figures include backfilled entries where marked.
 </p>

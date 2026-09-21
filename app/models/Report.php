@@ -432,6 +432,13 @@ class Report
      */
     public static function fundLedger(int $fundAccountId, string $from, string $to): array
     {
+        // Opening balance carried in from before the range start — the same
+        // balanceAsOf($from - 1 day) path the Statement of Expenditure uses,
+        // so the ledger's running balance always reconciles to the true
+        // fund_balances figure instead of restarting at zero each range.
+        $openingAsOf = (new DateTimeImmutable($from))->modify('-1 day')->format('Y-m-d');
+        $openingBalance = self::balanceAsOf($fundAccountId, $openingAsOf)['balance'];
+
         $stmt = Database::connection()->prepare(
             "SELECT
                 ledger.date,
@@ -445,7 +452,7 @@ class Report
                 ledger.amount_in,
                 ledger.amount_out,
                 ledger.is_historical,
-                SUM(ledger.amount_in - ledger.amount_out)
+                ? + SUM(ledger.amount_in - ledger.amount_out)
                     OVER (ORDER BY ledger.date, ledger.created_at ROWS UNBOUNDED PRECEDING) AS running_balance
              FROM (
                  SELECT date, created_at, 'topup' AS type, NULL AS document_no, NULL AS payee,
@@ -467,7 +474,7 @@ class Report
              LEFT JOIN departments d ON d.id = ledger.department_id
              ORDER BY ledger.date, ledger.created_at"
         );
-        $stmt->execute([$fundAccountId, $from, $to, $fundAccountId, $from, $to]);
+        $stmt->execute([$openingBalance, $fundAccountId, $from, $to, $fundAccountId, $from, $to]);
         $rows = $stmt->fetchAll();
 
         $totalIn = 0.0;
@@ -489,6 +496,8 @@ class Report
         return [
             'from' => $from,
             'to' => $to,
+            'opening_balance' => $openingBalance,
+            'opening_as_of' => $openingAsOf,
             'rows' => $rows,
             'total_in' => $totalIn,
             'total_out' => $totalOut,

@@ -6,11 +6,10 @@
  *            document_no: ?string, payee: ?string, department_id: ?int,
  *            department_name: ?string, description: ?string, amount_in: float,
  *            amount_out: float, is_historical: int, running_balance: float}>,
- *            total_in: float, total_out: float, has_historical: bool} $data
+ *            opening_balance: float, opening_as_of: string, total_in: float,
+ *            total_out: float, has_historical: bool} $data
  */
-$closing = !empty($data['rows'])
-    ? $data['rows'][count($data['rows']) - 1]['running_balance']
-    : 0.0;
+$closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
 ?>
 <div class="space-y-6">
     <div>
@@ -32,9 +31,9 @@ $closing = !empty($data['rows'])
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <?= metric_card('Opening Balance', format_amount($data['opening_balance'], 'neutral'), 'brought forward as of ' . View::e(date('d/m/Y', strtotime($from . ' -1 day')))) ?>
             <?= metric_card('Total In', format_amount($data['total_in'], 'credit')) ?>
             <?= metric_card('Total Out', format_amount($data['total_out'], 'debit')) ?>
-            <?= metric_card('Net Movement', format_amount($data['total_in'] - $data['total_out'], 'neutral')) ?>
             <?= metric_card('Closing Balance', format_amount($closing, 'neutral')) ?>
         </div>
 
@@ -60,6 +59,14 @@ $closing = !empty($data['rows'])
                             <td class="px-4 py-12 text-center text-on-surface-variant" colspan="9">No fund activity in this date range.</td>
                         </tr>
                     <?php else: ?>
+                        <tr class="bg-surface-container-low">
+                            <td class="px-4 py-3 text-on-surface-variant whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($from . ' -1 day'))) ?></td>
+                            <td class="px-4 py-3 text-on-surface-variant font-medium" colspan="4">Opening Balance brought forward</td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3"></td>
+                            <td class="px-4 py-3 text-right font-medium"><?= format_amount($data['opening_balance'], 'neutral') ?></td>
+                        </tr>
                         <?php foreach ($data['rows'] as $row): ?>
                             <tr class="hover:bg-surface-container-low transition-colors">
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($row['date']))) ?></td>
@@ -95,7 +102,8 @@ $closing = !empty($data['rows'])
         </div>
 
         <p class="text-label-sm text-on-surface-variant mt-4">
-            The running balance is computed in SQL via a window function over this date range (Tech Spec §14a) &mdash;
+            The running balance begins from the opening balance (balance as of the day before the range start, Tech Spec §10) carried
+            into each row via a SQL window function over this date range (Tech Spec §14a) &mdash;
             the same balance predicates used everywhere else in the app, never recalculated in PHP.
             <?php if ($data['has_historical']): ?> Rows marked Backfilled are reconstructed paper-book entries.<?php endif; ?>
         </p>

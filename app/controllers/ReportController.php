@@ -342,7 +342,18 @@ class ReportController
         $fundAccountId = Report::primaryFundAccountId();
         $data = Report::fundLedger($fundAccountId, $from, $to);
 
-        $rows = [];
+        $rows = [[
+            $data['opening_as_of'],
+            'Opening Balance',
+            '—',
+            '—',
+            '—',
+            'Brought forward as of ' . $data['opening_as_of'],
+            '',
+            '',
+            $data['opening_balance'],
+            'Live',
+        ]];
         foreach ($data['rows'] as $r) {
             $rows[] = [
                 $r['date'],
@@ -357,7 +368,7 @@ class ReportController
                 (int) $r['is_historical'] === 1 ? 'Backfilled' : 'Live',
             ];
         }
-        $closing = !empty($rows) ? $data['rows'][count($data['rows']) - 1]['running_balance'] : 0.0;
+        $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
         $rows[] = ['Total', '', '', '', '', '', $data['total_in'], $data['total_out'], $closing, ''];
 
         ExcelExporter::download(
