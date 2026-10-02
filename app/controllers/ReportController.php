@@ -342,30 +342,25 @@ class ReportController
         $fundAccountId = Report::primaryFundAccountId();
         $data = Report::fundLedger($fundAccountId, $from, $to);
 
-        $rows = [[
-            $data['opening_as_of'],
-            'Opening Balance',
-            '—',
-            '—',
-            '—',
-            'Brought forward as of ' . $data['opening_as_of'],
-            '',
-            '',
-            $data['opening_balance'],
-            'Live',
-        ]];
+        // $data['rows'] is already the full chronological ledger — transactions
+        // interleaved with the balance carry-forward rows at the range start and
+        // at the start of every month in the range, exactly as the screen and
+        // the PDF render it. No separate opening row is prepended here; doing so
+        // would duplicate the range's own carry-forward row.
+        $rows = [];
         foreach ($data['rows'] as $r) {
+            $isOpening = $r['type'] === 'opening';
             $rows[] = [
                 $r['date'],
-                ucfirst($r['type']),
+                $isOpening ? 'Opening Balance' : ucfirst($r['type']),
                 $r['document_no'] ?? '—',
                 $r['payee'] ?? '—',
                 $r['department_name'] ?? '—',
                 $r['description'] ?? '—',
-                $r['amount_in'],
-                $r['amount_out'],
+                $isOpening ? '' : $r['amount_in'],
+                $isOpening ? '' : $r['amount_out'],
                 $r['running_balance'],
-                (int) $r['is_historical'] === 1 ? 'Backfilled' : 'Live',
+                $isOpening ? '' : ((int) $r['is_historical'] === 1 ? 'Backfilled' : 'Live'),
             ];
         }
         $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];

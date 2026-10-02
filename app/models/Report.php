@@ -429,6 +429,11 @@ class Report
      * truth. Positional parameters are used (not the spec's named ones) so
      * the query works with emulated prepares OFF, which forbids reusing a
      * named parameter.
+     *
+     * The returned `rows` list is chronological and mixed: real transactions
+     * (type 'topup' / 'expense') interleaved with balance carry-forward rows
+     * (type 'opening', amounts null) at the start of the range and at the
+     * start of every month the range touches — see ledgerOpeningRows().
      */
     public static function fundLedger(int $fundAccountId, string $from, string $to): array
     {
@@ -493,15 +498,123 @@ class Report
         }
         unset($r);
 
+        // Mixed list for rendering: transactions + balance carry-forward rows
+        // in one chronological order, so the HTML, PDF and Excel renderers all
+        // show the ledger in the same sequence from this one array.
+        $hasTransactions = $rows !== [];
+        $rows = self::mergeLedgerRows(
+            $rows,
+            self::ledgerOpeningRows($fundAccountId, $from, $to, $openingAsOf, $openingBalance)
+        );
+
         return [
             'from' => $from,
             'to' => $to,
             'opening_balance' => $openingBalance,
             'opening_as_of' => $openingAsOf,
             'rows' => $rows,
+            'has_transactions' => $hasTransactions,
             'total_in' => $totalIn,
             'total_out' => $totalOut,
             'has_historical' => $hasHistorical,
         ];
+    }
+
+    /**
+     * Balance carry-forward rows for the ledger: one for the range's own
+     * opening balance, then one at the start of every month the range runs
+     * into. A range of 30 Sep – 2 Oct therefore opens September on 29 Sep and
+     * then shows what October was opened with on 1 Oct — even if nothing was
+     * spent that day, which is exactly what the paper book does at a month
+     * turn. Each carry-forward is balanceAsOf() of the last day of the month
+     * before it, the same single balance path (Tech Spec §10) the range's own
+     * opening balance uses, so a month-turn figure can never disagree with the
+     * running balance on the row above it.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function ledgerOpeningRows(
+        int $fundAccountId,
+        string $from,
+        string $to,
+        string $openingAsOf,
+        float $openingBalance
+    ): array {
+        $openings = [self::ledgerOpeningRow($openingAsOf, $openingBalance, 'Opening Balance brought forward')];
+
+        // First day of the month AFTER the one $from falls in — $from itself is
+        // already covered by the range's own opening row above.
+        $monthStart = (new DateTimeImmutable($from))->modify('first day of next month');
+
+        while ($monthStart->format('Y-m-d') <= $to) {
+            $priorMonthEnd = $monthStart->modify('-1 day')->format('Y-m-d');
+            $openings[] = self::ledgerOpeningRow(
+                $monthStart->format('Y-m-d'),
+                self::balanceAsOf($fundAccountId, $priorMonthEnd)['balance'],
+                'Balance brought forward from ' . (new DateTimeImmutable($priorMonthEnd))->format('F Y')
+            );
+            $monthStart = $monthStart->modify('+1 month');
+        }
+
+        return $openings;
+    }
+
+    /**
+     * One carry-forward row, shaped like a transaction row so renderers can
+     * loop over `rows` uniformly: no In/Out movement (null, not 0 — a zero
+     * would read as a real ₦0 transaction in the In/Out columns), and the
+     * carried figure sits in the running_balance column where a balance
+     * belongs.
+     *
+     * @return array<string, mixed>
+     */
+    private static function ledgerOpeningRow(string $date, float $balance, string $label): array
+    {
+        return [
+            'date' => $date,
+            'created_at' => null,
+            'type' => 'opening',
+            'document_no' => null,
+            'payee' => null,
+            'department_id' => null,
+            'department_name' => null,
+            'description' => $label,
+            'amount_in' => null,
+            'amount_out' => null,
+            'is_historical' => 0,
+            'running_balance' => $balance,
+        ];
+    }
+
+    /**
+     * Merges the two already-ordered sequences into one chronological list.
+     * Transactions arrive sorted by (date, created_at) from SQL and openings
+     * are generated in ascending order, so a single forward walk is enough.
+     * An opening row is emitted BEFORE any transaction sharing its date, so
+     * the carried-forward figure reads as the starting point of that day.
+     *
+     * @param array<int, array<string, mixed>> $transactionRows
+     * @param array<int, array<string, mixed>> $openingRows
+     * @return array<int, array<string, mixed>>
+     */
+    private static function mergeLedgerRows(array $transactionRows, array $openingRows): array
+    {
+        $merged = [];
+        $i = 0;
+        $count = count($transactionRows);
+
+        foreach ($openingRows as $opening) {
+            while ($i < $count && $transactionRows[$i]['date'] < $opening['date']) {
+                $merged[] = $transactionRows[$i];
+                $i++;
+            }
+            $merged[] = $opening;
+        }
+
+        for (; $i < $count; $i++) {
+            $merged[] = $transactionRows[$i];
+        }
+
+        return $merged;
     }
 }

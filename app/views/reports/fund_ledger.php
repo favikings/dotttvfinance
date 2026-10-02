@@ -2,12 +2,17 @@
 /**
  * @var string $from
  * @var string $to
- * @var array{rows: array<int, array{date: string, created_at: string, type: string,
+ * @var array{rows: array<int, array{date: string, created_at: ?string, type: string,
  *            document_no: ?string, payee: ?string, department_id: ?int,
- *            department_name: ?string, description: ?string, amount_in: float,
- *            amount_out: float, is_historical: int, running_balance: float}>,
- *            opening_balance: float, opening_as_of: string, total_in: float,
- *            total_out: float, has_historical: bool} $data
+ *            department_name: ?string, description: ?string, amount_in: ?float,
+ *            amount_out: ?float, is_historical: int, running_balance: float}>,
+ *            opening_balance: float, opening_as_of: string, has_transactions: bool,
+ *            total_in: float, total_out: float, has_historical: bool} $data
+ *
+ * `rows` is one chronological list mixing transactions (type 'topup' /
+ * 'expense') with balance carry-forward rows (type 'opening', In/Out null) —
+ * the range's own opening balance plus one at the start of every month the
+ * range runs into. See Report::fundLedger().
  */
 $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
 ?>
@@ -27,6 +32,7 @@ $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
             <p class="text-body-md text-on-surface-variant mt-1">
                 <?= View::e(date('d M Y', strtotime($from))) ?> &ndash; <?= View::e(date('d M Y', strtotime($to))) ?>
                 &middot; every approved top-up and expense, all departments, in one chronological list
+                &middot; the balance is carried forward at the start of every month in the range
             </p>
         </div>
 
@@ -54,20 +60,17 @@ $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-outline-variant">
-                    <?php if (empty($data['rows'])): ?>
-                        <tr>
-                            <td class="px-4 py-12 text-center text-on-surface-variant" colspan="9">No fund activity in this date range.</td>
-                        </tr>
-                    <?php else: ?>
-                        <tr class="bg-surface-container-low">
-                            <td class="px-4 py-3 text-on-surface-variant whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($from . ' -1 day'))) ?></td>
-                            <td class="px-4 py-3 text-on-surface-variant font-medium" colspan="4">Opening Balance brought forward</td>
-                            <td class="px-4 py-3"></td>
-                            <td class="px-4 py-3"></td>
-                            <td class="px-4 py-3"></td>
-                            <td class="px-4 py-3 text-right font-medium"><?= format_amount($data['opening_balance'], 'neutral') ?></td>
-                        </tr>
-                        <?php foreach ($data['rows'] as $row): ?>
+                    <?php foreach ($data['rows'] as $row): ?>
+                        <?php if ($row['type'] === 'opening'): ?>
+                            <tr class="bg-surface-container-low">
+                                <td class="px-4 py-3 text-on-surface-variant whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($row['date']))) ?></td>
+                                <td class="px-4 py-3 text-on-surface-variant font-medium" colspan="4"><?= View::e($row['description']) ?></td>
+                                <td class="px-4 py-3"></td>
+                                <td class="px-4 py-3"></td>
+                                <td class="px-4 py-3"></td>
+                                <td class="px-4 py-3 text-right font-medium"><?= format_amount($row['running_balance'], 'neutral') ?></td>
+                            </tr>
+                        <?php else: ?>
                             <tr class="hover:bg-surface-container-low transition-colors">
                                 <td class="px-4 py-3 text-on-surface whitespace-nowrap"><?= View::e(date('d/m/Y', strtotime($row['date']))) ?></td>
                                 <td class="px-4 py-3 whitespace-nowrap">
@@ -86,7 +89,12 @@ $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
                                 <td class="px-4 py-3 text-right whitespace-nowrap"><?= $row['amount_out'] > 0 ? format_amount($row['amount_out'], 'debit') : '—' ?></td>
                                 <td class="px-4 py-3 text-right whitespace-nowrap"><?= format_amount($row['running_balance'], 'neutral') ?></td>
                             </tr>
-                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <?php if (!$data['has_transactions']): ?>
+                        <tr>
+                            <td class="px-4 py-12 text-center text-on-surface-variant" colspan="9">No fund movement in this date range &mdash; the balances shown are brought forward.</td>
+                        </tr>
                     <?php endif; ?>
                 </tbody>
                 <tfoot class="bg-surface-container-low border-t border-outline-variant">
@@ -105,6 +113,7 @@ $closing = $data['opening_balance'] + $data['total_in'] - $data['total_out'];
             The running balance begins from the opening balance (balance as of the day before the range start, Tech Spec §10) carried
             into each row via a SQL window function over this date range (Tech Spec §14a) &mdash;
             the same balance predicates used everywhere else in the app, never recalculated in PHP.
+            Each month in the range opens with its own brought-forward row, so a month with no activity still shows what it started with.
             <?php if ($data['has_historical']): ?> Rows marked Backfilled are reconstructed paper-book entries.<?php endif; ?>
         </p>
     </div>
